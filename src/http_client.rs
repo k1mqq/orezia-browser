@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::format;
+use std::hash::Hash;
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::net::TcpStream;
+use std::num::ParseIntError;
+use std::ptr::read_unaligned;
 
 pub enum Method{
     GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH
@@ -25,17 +28,17 @@ impl Method{
     }
 }
 pub struct Request {
-    addr: String,
-    path: String,
-    method: Method,
-    headers: HashMap<String, String>,
-    body: String,
+    pub addr: String,
+    pub path: String,
+    pub method: Method,
+    pub headers: HashMap<String, String>,
+    pub body: String,
 }
 
 pub struct Response {
-    status: u8,
-    headers: HashMap<String, String>,
-    body: String,
+    pub status: u8,
+    pub headers: HashMap<String, String>,
+    pub body: String,
 }
 
 impl Request{
@@ -58,19 +61,76 @@ impl Request{
 
         stream.write_all(&message)?;
 
-        let buffer= BufReader::new(&stream);
-        for line in buffer.lines(){
-            let line = line?;
-            println!("{}", line);
+        let mut buffer= BufReader::new(&stream);
+
+        let mut status_line = String::new();
+        let response_headers;
+
+        buffer.read_line(&mut status_line)?;
+
+        let status_code = parse_status_line(status_line)?;
+
+        match status_code {
+            200 => {
+                // more than 100 headers -> error
+                // most browsers have 40KB limit on header size
+                let mut valid_field = false;
+                let mut field = String::new();
+
+                for _ in 1..101 {
+                    let mut field_line = String::new();
+                    buffer.read_line( &mut field_line)?;
+
+                    if field_line.replace("\r\n", "").is_empty() {
+                        valid_field = true;
+                        break;
+                    }
+
+                    field.push_str(&field_line);
+                }
+
+                match valid_field {
+                    true => {
+                        response_headers = parse_field(field)?;
+                    },
+                    false => {
+                        return Err("too many headers!".into())
+                    }
+                }
+            },
+            _ => {
+                println!("{}! NOOOOOO", status_code);
+                return Err("status code is not 200".into());
+            }
+
         }
 
-        let mut response_headers = HashMap::new();
-        response_headers.insert(String::from("Test"), String::from("test"));
+        // for line in buffer.lines(){
+        //     let line = line?;
+        //     // println!("{}", line);
+        // }
 
         Ok(Response{
-            status: 200,
+            status: status_code,
             headers: response_headers,
             body: String::from("this is body")
         })
     }
+}
+
+fn parse_status_line(status_line: String) -> Result<u8, ParseIntError> {
+    let v: Vec<&str> = status_line.split(" ").collect();
+    v[1].parse()
+}
+
+fn parse_field(field: String) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let mut headers = HashMap::new();
+
+    for line in field.lines() {
+        let (key, value) = line.split_once(": ").ok_or("parse failed")?;
+        headers.insert(key.to_string(), value.to_string());
+        println!("{}: {}", key, value);
+    }
+
+    Ok(headers)
 }
