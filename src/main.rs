@@ -4,14 +4,16 @@ use std::{collections::HashMap, error::Error};
 
 fn main()  -> Result<(), Box<dyn Error>> {
     let mut headers = HashMap::new();
-    headers.insert(String::from("test"), String::from("test"));
+    headers.insert("Host".to_string(), "example.com".to_string());
+    headers.insert("User-Agent".to_string(), "orezia-browser/0.0".to_string());
     let response = http_client::Request::new(
-        String::from("www.google.com:80"),
+        String::from("example.com:80"),
         String::from("/"),
         http_client::Method::GET,
         headers,
         String::from("")).send()?;
     println!("{}", &response.status);
+    println!("{}", &response.body);
 
     Ok(())
 }
