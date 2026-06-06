@@ -1,8 +1,31 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::net::TcpStream;
+
+#[derive(Debug)]
+pub enum HttpError {
+    Connection(std::io::Error),
+    Parse{
+        raw: String,
+    },
+}
+
+impl std::fmt::Display for HttpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HttpError::Connection(e) => write!(f, "connection error: {e}"),
+            HttpError::Parse { raw } => write!(f, "failed to parse: {raw}"),
+        }
+    }
+}
+
+impl From<std::io::Error> for HttpError {
+    fn from(err: std::io::Error) -> HttpError {
+        HttpError::Connection(err)
+    }
+}
+impl std::error::Error for HttpError {}
 
 pub enum Method{
     GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH
@@ -49,11 +72,11 @@ impl Request{
         for (key ,value) in &self.headers {
             field.push_str(&format!("{}: {}\r\n", key, value).to_string());
         }
-        let message = format!("{} {} HTTP/1.1\r\n{}\r\n", self.method.as_str(), self.path, field);
+        let message = format!("{} {} HTTP/1.1\r\n{}{}\r\n", self.method.as_str(), self.path, field, self.body);
         message.into_bytes()
     }
 
-    pub fn send(&self) -> Result<Response, Box<dyn Error>> {
+    pub fn send(&self) -> Result<Response, HttpError> {
         let mut stream = TcpStream::connect(&self.addr)?;
         println!("connected!");
 
@@ -67,82 +90,6 @@ impl Request{
         let response_headers = build_headers(&mut buffer)?;
 
         let mut body = String::new();
-
-        match status_code {
-            100 => {},
-            101 => {},
-            102 => {},
-            103 => {},
-
-            200 => {},
-            201 => {},
-            202 => {},
-            203 => {},
-            204 => {},
-            205 => {},
-            206 => {},
-
-            300 => {},
-            301 => {},
-            302 => {},
-            303 => {},
-            304 => {},
-            305 => {},
-            306 => {},
-            307 => {},
-            308 => {},
-
-            400 => {},
-            401 => {},
-            402 => {},
-            403 => {},
-            404 => {},
-            405 => {},
-            406 => {},
-            407 => {},
-            408 => {},
-            409 => {},
-            410 => {},
-            411 => {},
-            412 => {},
-            413 => {},
-            414 => {},
-            415 => {},
-            416 => {},
-            417 => {},
-            418 => {},
-            419 => {},
-            420 => {},
-            421 => {},
-            422 => {},
-            423 => {},
-            424 => {},
-            425 => {},
-            426 => {},
-            428 => {},
-            429 => {},
-            431 => {},
-            451 => {},
-
-            500 => {},
-            501 => {},
-            502 => {},
-            503 => {},
-            504 => {},
-            505 => {},
-            506 => {},
-            507 => {},
-            508 => {},
-            509 => {},
-            510 => {},
-            511 => {},
-
-            _ => {
-                println!("{}! NOOOOOO", status_code);
-                return Err("Received unknown status code".into());
-            }
-
-        }
 
         for line in buffer.lines(){
             let line = line?;
@@ -161,23 +108,25 @@ impl Request{
     }
 }
 
-fn build_status_code(buffer: &mut BufReader<&TcpStream>) -> Result<u16, Box<dyn Error>> {
+fn build_status_code(buffer: &mut BufReader<&TcpStream>) -> Result<u16, HttpError> {
     let mut status_line = String::new();
     buffer.read_line(&mut status_line)?;
 
     parse_status_line(status_line)
 }
 
-fn parse_status_line(status_line: String) -> Result<u16, Box<dyn Error>> {
+fn parse_status_line(status_line: String) -> Result<u16, HttpError> {
     let v: Vec<&str> = status_line.split(" ").collect();
-    let i: u16 = v[1].parse()?;
+    let i: u16 = v[1].parse().map_err(
+        |_| HttpError::Parse { raw: status_line }
+    )?;
     Ok(i)
 }
 
-fn build_headers(buffer: &mut BufReader<&TcpStream>) -> Result<HashMap<String, String>, Box<dyn Error>> {
+fn build_headers(buffer: &mut BufReader<&TcpStream>) -> Result<HashMap<String, String>, HttpError> {
     // more than 100 headers -> error
     // most browsers have 40KB limit on header size
-    // does not care transfer encoding
+    // does not care transfer encoding for now
     let mut valid_field = false;
     let mut field = String::new();
 
@@ -198,16 +147,18 @@ fn build_headers(buffer: &mut BufReader<&TcpStream>) -> Result<HashMap<String, S
             parse_field(field)
         },
         false => {
-            Err("too many headers!".into())
+            Err(HttpError::Parse{
+                raw: "Too many headers. It may not be considered as parse error lol".to_string()
+            })
         }
     }
 }
 
-fn parse_field(field: String) -> Result<HashMap<String, String>, Box<dyn Error>> {
+fn parse_field(field: String) -> Result<HashMap<String, String>, HttpError> {
     let mut headers = HashMap::new();
 
     for line in field.lines() {
-        let (key, value) = line.split_once(": ").ok_or("parse failed")?;
+        let (key, value) = line.split_once(": ").ok_or(HttpError::Parse { raw: line.to_string() })?;
         headers.insert(key.to_string(), value.to_string());
     }
 
