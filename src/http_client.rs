@@ -3,7 +3,6 @@ use std::error::Error;
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::net::TcpStream;
-use std::num::ParseIntError;
 
 pub enum Method{
     GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH
@@ -63,48 +62,84 @@ impl Request{
         stream.write_all(&message)?;
 
         let mut buffer= BufReader::new(&stream);
+        let status_code = build_status_code(&mut buffer)?;
 
-        let mut status_line = String::new();
-        let response_headers;
-
-        buffer.read_line(&mut status_line)?;
-
-        let status_code = parse_status_line(status_line)?;
+        let response_headers = build_headers(&mut buffer)?;
 
         let mut body = String::new();
 
         match status_code {
-            200 => {
-                // more than 100 headers -> error
-                // most browsers have 40KB limit on header size
-                // does not care transfer encoding
-                let mut valid_field = false;
-                let mut field = String::new();
+            100 => {},
+            101 => {},
+            102 => {},
+            103 => {},
 
-                for _ in 1..101 {
-                    let mut field_line = String::new();
-                    buffer.read_line( &mut field_line)?;
+            200 => {},
+            201 => {},
+            202 => {},
+            203 => {},
+            204 => {},
+            205 => {},
+            206 => {},
 
-                    if field_line.replace("\r\n", "").is_empty() {
-                        valid_field = true;
-                        break;
-                    }
+            300 => {},
+            301 => {},
+            302 => {},
+            303 => {},
+            304 => {},
+            305 => {},
+            306 => {},
+            307 => {},
+            308 => {},
 
-                    field.push_str(&field_line);
-                }
+            400 => {},
+            401 => {},
+            402 => {},
+            403 => {},
+            404 => {},
+            405 => {},
+            406 => {},
+            407 => {},
+            408 => {},
+            409 => {},
+            410 => {},
+            411 => {},
+            412 => {},
+            413 => {},
+            414 => {},
+            415 => {},
+            416 => {},
+            417 => {},
+            418 => {},
+            419 => {},
+            420 => {},
+            421 => {},
+            422 => {},
+            423 => {},
+            424 => {},
+            425 => {},
+            426 => {},
+            428 => {},
+            429 => {},
+            431 => {},
+            451 => {},
 
-                match valid_field {
-                    true => {
-                        response_headers = parse_field(field)?;
-                    },
-                    false => {
-                        return Err("too many headers!".into())
-                    }
-                }
-            },
+            500 => {},
+            501 => {},
+            502 => {},
+            503 => {},
+            504 => {},
+            505 => {},
+            506 => {},
+            507 => {},
+            508 => {},
+            509 => {},
+            510 => {},
+            511 => {},
+
             _ => {
                 println!("{}! NOOOOOO", status_code);
-                return Err("status code is not 200".into());
+                return Err("Received unknown status code".into());
             }
 
         }
@@ -126,9 +161,46 @@ impl Request{
     }
 }
 
-fn parse_status_line(status_line: String) -> Result<u16, ParseIntError> {
+fn build_status_code(buffer: &mut BufReader<&TcpStream>) -> Result<u16, Box<dyn Error>> {
+    let mut status_line = String::new();
+    buffer.read_line(&mut status_line)?;
+
+    parse_status_line(status_line)
+}
+
+fn parse_status_line(status_line: String) -> Result<u16, Box<dyn Error>> {
     let v: Vec<&str> = status_line.split(" ").collect();
-    v[1].parse()
+    let i: u16 = v[1].parse()?;
+    Ok(i)
+}
+
+fn build_headers(buffer: &mut BufReader<&TcpStream>) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    // more than 100 headers -> error
+    // most browsers have 40KB limit on header size
+    // does not care transfer encoding
+    let mut valid_field = false;
+    let mut field = String::new();
+
+    for _ in 1..101 {
+        let mut field_line = String::new();
+        buffer.read_line( &mut field_line)?;
+
+        if field_line.replace("\r\n", "").is_empty() {
+            valid_field = true;
+            break;
+        }
+
+        field.push_str(&field_line);
+    }
+
+    match valid_field {
+        true => {
+            parse_field(field)
+        },
+        false => {
+            Err("too many headers!".into())
+        }
+    }
 }
 
 fn parse_field(field: String) -> Result<HashMap<String, String>, Box<dyn Error>> {
@@ -137,7 +209,6 @@ fn parse_field(field: String) -> Result<HashMap<String, String>, Box<dyn Error>>
     for line in field.lines() {
         let (key, value) = line.split_once(": ").ok_or("parse failed")?;
         headers.insert(key.to_string(), value.to_string());
-        // println!("{}: {}", key, value);
     }
 
     Ok(headers)
