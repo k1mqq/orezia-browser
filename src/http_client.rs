@@ -8,6 +8,7 @@ pub enum HttpError {
     Connection(std::io::Error),
     Parse{
         raw: String,
+        message: String,
     },
 }
 
@@ -15,7 +16,7 @@ impl std::fmt::Display for HttpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             HttpError::Connection(e) => write!(f, "connection error: {e}"),
-            HttpError::Parse { raw } => write!(f, "failed to parse: {raw}"),
+            HttpError::Parse { raw, message} => write!(f, "{message}\nraw: {raw}"),
         }
     }
 }
@@ -89,16 +90,7 @@ impl Request{
 
         let response_headers = build_headers(&mut buffer)?;
 
-        let mut body = String::new();
-
-        for line in buffer.lines(){
-            let line = line?;
-
-            if line.replace("\r\n", "").is_empty() {
-                break;
-            }
-            body.push_str(&line);
-        }
+        let body = build_body(&mut buffer)?;
 
         Ok(Response{
             status: status_code,
@@ -106,6 +98,33 @@ impl Request{
             body: body,
         })
     }
+}
+
+fn build_body(buffer: &mut BufReader<&TcpStream>) -> Result<String, HttpError> {
+    let mut size_line = String::new();
+    let mut body = String::new();
+
+    buffer.read_line(&mut size_line)?;
+    size_line = size_line.replace("\r\n", "");
+
+    // size does nothing for now
+    let _size= u32::from_str_radix(&size_line, 16).map_err(
+        |_| HttpError::Parse {
+            message: "Chunk size may be too big".to_string(), 
+            raw: size_line,
+        }
+    )?;
+
+    for line in buffer.lines(){
+        let line = line?;
+
+        if line.replace("\r\n", "").is_empty() {
+            break;
+        }
+        body.push_str(&line);
+    }
+
+    Ok(body)
 }
 
 fn build_status_code(buffer: &mut BufReader<&TcpStream>) -> Result<u16, HttpError> {
@@ -117,9 +136,10 @@ fn build_status_code(buffer: &mut BufReader<&TcpStream>) -> Result<u16, HttpErro
 
 fn parse_status_line(status_line: String) -> Result<u16, HttpError> {
     let v: Vec<&str> = status_line.split(" ").collect();
-    let i: u16 = v[1].parse().map_err(
-        |_| HttpError::Parse { raw: status_line }
-    )?;
+    let i: u16 = v[1].parse().map_err(|_| HttpError::Parse {
+        raw: status_line,
+        message: "invalid status line".to_string()
+    })?;
     Ok(i)
 }
 
@@ -148,7 +168,8 @@ fn build_headers(buffer: &mut BufReader<&TcpStream>) -> Result<HashMap<String, S
         },
         false => {
             Err(HttpError::Parse{
-                raw: "Too many headers. It may not be considered as parse error lol".to_string()
+                message: "Too many headers.".to_string(),
+                raw: field,
             })
         }
     }
@@ -158,7 +179,10 @@ fn parse_field(field: String) -> Result<HashMap<String, String>, HttpError> {
     let mut headers = HashMap::new();
 
     for line in field.lines() {
-        let (key, value) = line.split_once(": ").ok_or(HttpError::Parse { raw: line.to_string() })?;
+        let (key, value) = line.split_once(": ").ok_or(HttpError::Parse {
+            raw: line.to_string(),
+            message: "Parse failed :(".to_string(),
+        })?;
         headers.insert(key.to_string(), value.to_string());
     }
 
