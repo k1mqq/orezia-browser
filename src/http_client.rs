@@ -101,30 +101,42 @@ impl Request{
 }
 
 fn build_body(buffer: &mut BufReader<&TcpStream>) -> Result<String, HttpError> {
-    let mut size_line = String::new();
     let mut body = String::new();
 
-    buffer.read_line(&mut size_line)?;
-    size_line = size_line.replace("\r\n", "");
+    // more than 100 chunks -> error
+    for _ in 1..101 {
+        let mut size_line = String::new();
+        buffer.read_line(&mut size_line)?;
 
-    // size does nothing for now
-    let _size= u32::from_str_radix(&size_line, 16).map_err(
-        |_| HttpError::Parse {
-            message: "Chunk size may be too big".to_string(), 
-            raw: size_line,
+        size_line = size_line.replace("\r\n", "");
+
+        let size= usize::from_str_radix(&size_line, 16).map_err(
+            |_| HttpError::Parse {
+                message: "Chunk size may be too big".to_string(), 
+                raw: size_line,
+            }
+        )?;
+
+        if size == 0 {
+            let mut trailing = String::new();
+            buffer.read_line(&mut trailing)?;
+            return Ok(body);
         }
-    )?;
 
-    for line in buffer.lines(){
-        let line = line?;
+        let mut buf = vec![0u8; size];
 
-        if line.replace("\r\n", "").is_empty() {
-            break;
-        }
-        body.push_str(&line);
+        buffer.read_exact(&mut buf)?;
+
+        let mut trailing = String::new();
+        buffer.read_line(&mut trailing)?;
+
+        body.push_str(&String::from_utf8(buf).map_err(|_| HttpError::Parse{
+            raw: "".to_string(),
+            message: "invalid body".to_string(),
+        })?);
     }
 
-    Ok(body)
+    Err(HttpError::Parse { raw: "".to_string(), message: "invalid body".to_string() })
 }
 
 fn build_status_code(buffer: &mut BufReader<&TcpStream>) -> Result<u16, HttpError> {
