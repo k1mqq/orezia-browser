@@ -1,4 +1,5 @@
 mod http_client;
+mod html_parser;
 
 use std::{collections::HashMap, error::Error};
 
@@ -15,5 +16,8 @@ fn main()  -> Result<(), Box<dyn Error>> {
     println!("{}", &response.status);
     println!("{}", &response.body);
 
+    let tokens = html_parser::Tokenizer::new(&response.body).tokenize();
+
+    println!("{:?}", &tokens);
     Ok(())
 }
