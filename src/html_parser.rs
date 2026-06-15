@@ -128,7 +128,7 @@ impl Tokenizer {
                                 // is clone ok? maybe yes.
                                 tokens.push(Token::StartTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing });
                             }else {
-                                tokens.push(Token::EndTag { name: self.current_attribute_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing });
+                                tokens.push(Token::EndTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing });
                             }
                             self.state = TokenizerState::Data;
                         }
@@ -275,9 +275,9 @@ impl Tokenizer {
                             self.consume();
                             self.state = TokenizerState::Data;
                             if self.is_current_tag_open {
-                                tokens.push(Token::StartTag { name: self.current_attribute_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
+                                tokens.push(Token::StartTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
                             } else {
-                                tokens.push(Token::EndTag { name: self.current_attribute_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
+                                tokens.push(Token::EndTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
                             }
                         }
                         Some(_) | None => {
@@ -331,9 +331,9 @@ impl Tokenizer {
                             self.consume();
                             self.state = TokenizerState::Data;
                             if self.is_current_tag_open {
-                                tokens.push(Token::StartTag { name: self.current_attribute_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
+                                tokens.push(Token::StartTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
                             } else {
-                                tokens.push(Token::EndTag { name: self.current_attribute_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
+                                tokens.push(Token::EndTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
                             }
                         }
                         Some(c) => {
@@ -362,9 +362,9 @@ impl Tokenizer {
                             self.consume();
                             self.state = TokenizerState::Data;
                             if self.is_current_tag_open {
-                                tokens.push(Token::StartTag { name: self.current_attribute_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
+                                tokens.push(Token::StartTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
                             } else {
-                                tokens.push(Token::EndTag { name: self.current_attribute_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
+                                tokens.push(Token::EndTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
                             }
                         }
                         Some(_) => {
@@ -386,9 +386,9 @@ impl Tokenizer {
                             self.current_tag_self_closing = true;
                             self.state = TokenizerState::Data;
                             if self.is_current_tag_open {
-                                tokens.push(Token::StartTag { name: self.current_attribute_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
+                                tokens.push(Token::StartTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
                             } else {
-                                tokens.push(Token::EndTag { name: self.current_attribute_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
+                                tokens.push(Token::EndTag { name: self.current_tag_name.clone(), attributes: self.current_attributes.clone(), self_closing: self.current_tag_self_closing })
                             }
                         }
                         Some(_) => {
