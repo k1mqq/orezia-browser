@@ -1,4 +1,4 @@
-use crate::parser::*;
+use crate::html_parser::*;
 
 enum InsertionMode {
     Initial,

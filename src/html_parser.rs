@@ -1,8 +1,8 @@
-pub mod html_tokenizer;
-pub mod html_tree_constructor;
+pub mod tokenizer;
+pub mod tree_constructor;
 
-pub use html_tokenizer::Tokenizer;
-pub use html_tree_constructor::TreeConstructor;
+pub use tokenizer::Tokenizer;
+pub use tree_constructor::TreeConstructor;
 
 #[derive(Debug)]
 pub struct Dom {

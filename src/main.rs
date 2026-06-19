@@ -1,5 +1,5 @@
 mod http_client;
-mod parser;
+mod html_parser;
 
 use std::{collections::HashMap, error::Error};
 
@@ -16,13 +16,13 @@ fn main()  -> Result<(), Box<dyn Error>> {
     println!("{}", &response.status);
     println!("{}", &response.body);
 
-    let mut tokenizer = parser::Tokenizer::new(&response.body);
-    let mut tree_builder = parser::TreeConstructor::new();
+    let mut tokenizer = html_parser::Tokenizer::new(&response.body);
+    let mut tree_builder = html_parser::TreeConstructor::new();
 
     loop {
         let token = tokenizer.next_token();
         tree_builder.process_token(&token);
-        if matches!(token, parser::Token::Eof) {
+        if matches!(token, html_parser::Token::Eof) {
             break;
         }
     }

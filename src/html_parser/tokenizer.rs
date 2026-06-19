@@ -1,4 +1,4 @@
-use crate::parser::Token;
+use crate::html_parser::Token;
 
 enum TokenizerState {
     Data,
