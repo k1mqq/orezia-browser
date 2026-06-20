@@ -48,3 +48,18 @@ pub enum Token {
     Character(char),
     Eof,
 }
+
+pub fn parse(input: String) -> Dom{
+    let mut tokenizer = Tokenizer::new(&input);
+    let mut tree_builder = TreeConstructor::new();
+
+    loop {
+        let token = tokenizer.next_token();
+        tree_builder.process_token(&token);
+        if matches!(token, Token::Eof) {
+            break;
+        }
+    }
+
+    tree_builder.dom
+}
