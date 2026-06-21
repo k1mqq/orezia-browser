@@ -1,6 +1,7 @@
 mod http_client;
 mod html_parser;
 mod renderer;
+mod layout;
 
 use std::{collections::HashMap, error::Error};
 
@@ -20,6 +21,8 @@ fn main()  -> Result<(), Box<dyn Error>> {
     let dom = html_parser::parse( response.body);
 
     println!("{:?}", dom);
+
+    let layout = layout::Layout::build(&dom);
 
     renderer::render();
     Ok(())

@@ -6,17 +6,17 @@ pub use tree_constructor::TreeConstructor;
 
 #[derive(Debug)]
 pub struct Dom {
-    nodes: Vec<Node>,
+    pub nodes: Vec<Node>,
 }
 
 #[derive(Debug)]
 pub struct Node {
-    node_type: NodeType,
-    children: Vec<NodeId>,
-    parent: Option<NodeId>
+    pub node_type: NodeType,
+    pub children: Vec<NodeId>,
+    pub parent: Option<NodeId>
 }
 
-type NodeId = usize;
+pub type NodeId = usize;
 
 #[derive(Debug)]
 pub enum NodeType{
