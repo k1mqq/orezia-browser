@@ -19,7 +19,8 @@ pub struct TreeConstructor {
 impl TreeConstructor {
     pub fn new() -> Self{
         TreeConstructor {
-            dom: Dom{ nodes: vec![Node{node_type:NodeType::Document,children:Vec::new(), parent: None }] },
+            // dom: Dom{ nodes: vec![Node{node_type:NodeType::Document,children:Vec::new(), parent: None }] },
+            dom: Dom{ nodes: Vec::new() },
             mode: InsertionMode::Initial,
             open_elements: Vec::new(),
         }
