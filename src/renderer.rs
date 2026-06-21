@@ -1,19 +1,31 @@
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
+use fontdue::Font;
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{self, ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
 
-#[derive(Default)]
 struct App {
+    font: Font,
     state: Option<(Arc<Window>, softbuffer::Surface<Arc<Window>, Arc<Window>>)>,
 }
 
 impl App {
     fn new() -> Self {
-        Self { state: None }
+        let font = include_bytes!("../resources/NotoSansCJKjp-Regular.otf") as &[u8];
+        let settings = fontdue::FontSettings {
+            scale: 200.0,
+            ..fontdue::FontSettings::default()
+        };
+
+        let font = Font::from_bytes(font, settings).unwrap();
+
+        Self {
+            font: font,
+            state: None
+        }
     }
 }
 
@@ -57,11 +69,9 @@ impl ApplicationHandler for App {
 
                 let mut buf = surface.buffer_mut().unwrap();
 
-                for (i, pixel) in buf.iter_mut().enumerate() {
-                    let x = (i % w as usize) as u32;
-                    let y = (i / w as usize) as u32;
-                    *pixel = fill(x, y, w, h);
-                }
+                draw(&mut buf, w);
+                
+                draw_char(&mut buf, w, &self.font, 'k');
 
                 buf.present().unwrap();
             }
@@ -70,14 +80,23 @@ impl ApplicationHandler for App {
     }
 }
 
-fn fill(x: u32, y: u32, w: u32, h: u32) -> u32 {
-    let r = (x * 255 / w) as u8;
-    let g = (y * 255 / h) as u8;
-    let b: u8 = 0x40;
-    rgb(r, g, b)
+fn draw(buffer:&mut [u32], width: u32) {
+    buffer.fill(rgb(255, 255, 255));
 }
- 
-#[inline]
+
+fn draw_char(buffer: &mut [u32], width: u32, font: &Font, character: char) {
+    let (metrics, bitmap) = font.rasterize(character, 200.0);
+
+    for (i, bit) in bitmap.iter().enumerate() {
+        let c = 255 - *bit;
+
+        let x: usize = i % metrics.width;
+        let y: usize = i / metrics.width;
+
+        buffer[y * width as usize + x] = rgb(c, c, c);
+    }
+}
+
 fn rgb(r: u8, g: u8, b: u8) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
 }
