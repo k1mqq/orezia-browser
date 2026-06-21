@@ -24,6 +24,6 @@ fn main()  -> Result<(), Box<dyn Error>> {
 
     let layout = layout::Layout::build(&dom);
 
-    renderer::render();
+    renderer::render(layout);
     Ok(())
 }

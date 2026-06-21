@@ -7,20 +7,25 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
 
+use crate::layout::{Content, Layout};
+
 struct Renderer {
     font: Font,
     buffer: Vec<u32>,
+    layout: Layout,
     width: u32,
     height: u32,
 }
 
 struct App {
-    renderer: Option<Renderer>,
+    renderer: Renderer,
     state: Option<(Arc<Window>, softbuffer::Surface<Arc<Window>, Arc<Window>>)>,
 }
 
 impl Renderer {
-    fn new(width: u32, height: u32) -> Self {
+    // it is unusable when initialized, because width and height are zero
+    // draw is called with width and height, so it's ok
+    fn new(layout: Layout) -> Self {
         let font = include_bytes!("../resources/NotoSansCJKjp-Regular.otf") as &[u8];
         let settings = fontdue::FontSettings {
             scale: 200.0,
@@ -31,9 +36,10 @@ impl Renderer {
 
         Self {
             font: font,
-            buffer: vec![u32::MAX; (width * height) as usize],
-            width: width,
-            height: height,
+            buffer: Vec::new(),
+            layout: layout,
+            width: 0,
+            height: 0,
         }
     }
 
@@ -44,12 +50,29 @@ impl Renderer {
 
         self.draw_char('k', 100, 100, 100.0);
         self.draw_string("Orezia by k1mq!".to_string(), 100, 200, 100.0);
+        self.draw_layout();
 
         for (i, pixel) in buffer.iter_mut().enumerate() {
             let x = i % width as usize;
             let y = i / width as usize;
 
             *pixel = self.pixel_at(x, y);
+        }
+    }
+
+    fn draw_layout(&mut self) {
+        let draw_calls: Vec<(String, usize, usize)> = self.layout.components
+            .iter()
+            .filter_map(|c| {
+                if let Some(Content::Text(ref text)) = c.content {
+                    Some((text.clone(), c.rect.x as usize, c.rect.y as usize))
+                } else {
+                    None
+                }
+            }).collect();
+        
+        for (text, x, y) in draw_calls {
+            self.draw_string(text, x, y, 20.0);
         }
     }
 
@@ -85,9 +108,9 @@ impl Renderer {
 }
 
 impl App {
-    fn new() -> Self {
+    fn new(renderer: Renderer) -> Self {
         Self {
-            renderer: None,
+            renderer: renderer,
             state: None
         }
     }
@@ -100,7 +123,6 @@ impl ApplicationHandler for App {
         let context = softbuffer::Context::new(Arc::clone(&window)).unwrap();
         let surface = softbuffer::Surface::new(&context, Arc::clone(&window)).unwrap();
 
-        self.renderer = Some(Renderer::new(window.inner_size().width, window.inner_size().height));
         self.state = Some((window, surface));
     }
     fn window_event(
@@ -120,10 +142,6 @@ impl ApplicationHandler for App {
                     return;
                 };
 
-                let Some(renderer)  = self.renderer.as_mut() else {
-                    return;
-                };
-
                 let size = window.inner_size();
 
                 let (w, h) = (size.width, size.height);
@@ -138,7 +156,7 @@ impl ApplicationHandler for App {
 
                 let mut buf = surface.buffer_mut().unwrap();
 
-                renderer.draw(&mut buf, w, h);
+                self.renderer.draw(&mut buf, w, h);
                 
                 buf.present().unwrap();
             }
@@ -151,10 +169,12 @@ fn rgb(r: u8, g: u8, b: u8) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
 }
 
-pub fn render() {
+pub fn render(layout: Layout) {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
 
-    let mut app = App::new();
+    let mut renderer = Renderer::new(layout);
+    let mut app = App::new(renderer);
+
     event_loop.run_app(&mut app).unwrap();
 }
