@@ -121,8 +121,8 @@ impl TreeConstructor {
             }
             Token::StartTag { name, attributes, self_closing } => {
                 let element = self.create_element(name.clone(), attributes.clone());
-                self.open_elements.push(element);
                 self.insert_element(element);
+                self.open_elements.push(element);
                 return false;
             }
             Token::EndTag { name, attributes, self_closing } => {
@@ -158,17 +158,19 @@ impl TreeConstructor {
     }
 
     fn insert_element(&mut self, element_id: NodeId) {
-        let current_node_id = *self.open_elements.last().expect("open_element is empty :(");
+        let Some(current_node_id) = self.open_elements.last() else {
+            return;
+        };
         match self.dom.nodes.get_mut(element_id) {
             Some(element) => {
-                element.parent = Some(current_node_id);
+                element.parent = Some(*current_node_id);
             }
             None => {
                 println!("element not found");
             }
         }
         // it must be safe
-        self.dom.nodes.get_mut(current_node_id).unwrap().children.push(element_id);
+        self.dom.nodes.get_mut(*current_node_id).unwrap().children.push(element_id);
     }
 
     fn insert_character(&mut self, character:char) {
