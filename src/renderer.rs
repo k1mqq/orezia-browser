@@ -42,7 +42,8 @@ impl Renderer {
         self.height = height;
         self.buffer = vec![u32::MAX; (width * height) as usize];
 
-        self.draw_char('k', 100, 100);
+        self.draw_char('k', 100, 100, 100.0);
+        self.draw_string("Orezia by k1mq!".to_string(), 100, 200, 100.0);
 
         for (i, pixel) in buffer.iter_mut().enumerate() {
             let x = i % width as usize;
@@ -52,16 +53,29 @@ impl Renderer {
         }
     }
 
-    fn draw_char(&mut self, character: char, x: usize, y: usize) {
-        let (metrics, bitmap) = self.font.rasterize(character, 200.0);
+    fn draw_char(&mut self, character: char, x: usize, y: usize, size: f32) {
+        let (metrics, bitmap) = self.font.rasterize(character, size);
 
         for (i, bit) in bitmap.iter().enumerate() {
             let c = 255 - *bit;
 
+            let ascent = metrics.height as i32 + metrics.bounds.ymin as i32;
+
             let x: usize = i % metrics.width + x;
-            let y: usize = i / metrics.width + y;
+            let y: usize = i / metrics.width + y - ascent as usize;
 
             self.buffer[y * self.width as usize + x] = rgb(c, c, c);
+        }
+    }
+
+    fn draw_string(&mut self, string: String, x: usize, y: usize, size: f32) {
+        let mut x = x;
+        // let mut y = y;
+        for ch in string.chars() {
+            let metrics = self.font.metrics(ch, size);
+            self.draw_char(ch, x, y, size);
+
+            x = x + metrics.advance_width as usize;
         }
     }
 
