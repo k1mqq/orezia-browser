@@ -113,17 +113,6 @@ impl Renderer {
         }
     }
 
-    fn draw_glyph(&mut self, metrics: Metrics, bitmap: &[u8], x: usize, y:usize) {
-        for (i, bit) in bitmap.iter().enumerate() {
-            let c = 255 - *bit;
-
-            let x: usize = i % metrics.width + x as usize;
-            let y: usize = i / metrics.width + y as usize;
-
-            self.buffer[y * self.width as usize + x] = rgb(c, c, c);
-        }
-    }
-
     fn pixel_at(&self, x: usize, y: usize) -> u32{
         self.buffer[y * self.width as usize + x]
     }

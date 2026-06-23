@@ -6,11 +6,12 @@ mod layout;
 use std::{collections::HashMap, error::Error};
 
 fn main()  -> Result<(), Box<dyn Error>> {
+    let test = "example.com";
     let mut headers = HashMap::new();
-    headers.insert("Host".to_string(), "example.com".to_string());
+    headers.insert("Host".to_string(), test.to_string());
     headers.insert("User-Agent".to_string(), "orezia-browser/0.0".to_string());
     let response = http_client::Request::new(
-        String::from("example.com:80"),
+        String::from(format!("{}:80", test)),
         String::from("/"),
         http_client::Method::GET,
         headers,
