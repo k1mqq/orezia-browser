@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use fontdue::Font;
+use fontdue::{Font, Metrics};
 use fontdue::layout::{CoordinateSystem, LayoutSettings, TextStyle};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -14,6 +14,7 @@ struct Renderer {
     font: Font,
     buffer: Vec<u32>,
     layout: Layout,
+    font_layout: fontdue::layout::Layout,
     width: u32,
     height: u32,
 }
@@ -35,10 +36,13 @@ impl Renderer {
 
         let font = Font::from_bytes(font, settings).unwrap();
 
+        let font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
+
         Self {
             font: font,
             buffer: Vec::new(),
             layout: layout,
+            font_layout: font_layout,
             width: 0,
             height: 0,
         }
@@ -93,21 +97,30 @@ impl Renderer {
     }
 
     fn draw_string(&mut self, string: String, x: usize, y: usize, size: f32) {
-        let mut font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
-        
-        font_layout.reset(&LayoutSettings::default());
+        self.font_layout.reset(&LayoutSettings::default());
         // is this clone ok?
-        font_layout.append(&[self.font.clone()], &TextStyle::new(&string, size, 0));
-        for glyph in font_layout.glyphs() {
+        self.font_layout.append(&[self.font.clone()], &TextStyle::new(&string, size, 0));
+        for glyph in self.font_layout.glyphs() {
             let (metrics, bitmap) = self.font.rasterize_config(glyph.key);
             for (i, bit) in bitmap.iter().enumerate() {
                 let c = 255 - *bit;
 
-                let x: usize = i % metrics.width + x + glyph.x as usize;
-                let y: usize = i / metrics.width + y + glyph.y as usize;
+                let x: usize = i % metrics.width + x as usize + glyph.x as usize;
+                let y: usize = i / metrics.width + y as usize + glyph.y as usize;
 
                 self.buffer[y * self.width as usize + x] = rgb(c, c, c);
             }
+        }
+    }
+
+    fn draw_glyph(&mut self, metrics: Metrics, bitmap: &[u8], x: usize, y:usize) {
+        for (i, bit) in bitmap.iter().enumerate() {
+            let c = 255 - *bit;
+
+            let x: usize = i % metrics.width + x as usize;
+            let y: usize = i / metrics.width + y as usize;
+
+            self.buffer[y * self.width as usize + x] = rgb(c, c, c);
         }
     }
 
