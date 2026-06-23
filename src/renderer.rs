@@ -8,7 +8,7 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
 
-use crate::layout::{Content, Layout};
+use crate::layout::{Layout};
 
 struct Renderer {
     font: Font,
@@ -69,8 +69,8 @@ impl Renderer {
         let draw_calls: Vec<(String, usize, usize)> = self.layout.components
             .iter()
             .filter_map(|c| {
-                if let Some(Content::Text(ref text)) = c.content {
-                    Some((text.clone(), c.rect.x as usize, c.rect.y as usize))
+                if let Some(text) = &c.text {
+                    Some((text.clone(), c.dimentions.content.x as usize, c.dimentions.content.y as usize))
                 } else {
                     None
                 }
@@ -109,7 +109,7 @@ impl Renderer {
                 let y: usize = i / metrics.width + y as usize + glyph.y as usize;
 
                 if x >= self.width as usize || y >= self.height as usize {
-                    return;
+                    break;
                 }
 
                 self.buffer[y * self.width as usize + x] = rgb(c, c, c);
