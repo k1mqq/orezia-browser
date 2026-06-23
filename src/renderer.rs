@@ -108,6 +108,10 @@ impl Renderer {
                 let x: usize = i % metrics.width + x as usize + glyph.x as usize;
                 let y: usize = i / metrics.width + y as usize + glyph.y as usize;
 
+                if x >= self.width as usize || y >= self.height as usize {
+                    return;
+                }
+
                 self.buffer[y * self.width as usize + x] = rgb(c, c, c);
             }
         }
