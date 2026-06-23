@@ -27,7 +27,7 @@ impl Layout {
     pub fn build(dom: &Dom) -> Self {
         let mut components = Vec::new();
 
-        next_component(&mut components, dom, 0, None);
+        next_component(&mut components, dom, 0, None, None);
 
         Self {
             components: components,
@@ -35,58 +35,54 @@ impl Layout {
     }
 }
 
-fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, parent: Option<ComponentId>) -> ComponentId {
+fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, parent: Option<ComponentId>, brother: Option<ComponentId>) -> ComponentId {
     // println!("{}", node_id);
     let node = &dom.nodes[node_id];
+    let id = components.len();
+
+
+    let mut y = match parent {
+        Some(parent_id) => {
+            components[parent_id].rect.y
+        }
+        None => 0.0
+    };
+
+    match brother {
+        Some(brother_id) => {
+            y += components[brother_id].rect.y + components[brother_id].rect.height;
+        }
+        None => {}
+    }
+
     match &node.node_type {
-        // this is temporary!!
-        NodeType::Document => {
-            // no Document node exists.
-            return 0;
-        },
-        NodeType::Element{ tag, attributes} => {
-            let id = components.len();
-            let mut children = Vec::new();
-
-
-            let y = match parent {
-                Some(parent_id) => {
-                    components[parent_id].rect.y + 40.0
-                }
-                None => 0.0
-            };
+        NodeType::Element { tag, attributes } => {
             components.push(Component {
-                rect: Rect{ x: 0.0, y: y , width: 100.0, height: 20.0 },
+                rect: Rect{ x: 0.0, y: y , width: 100.0, height: 40.0 },
                 content: None,
-
             });
-
-            for child in &node.children {
-                children.push(next_component(components, dom, *child, Some(id)));
-            }
-
-            return id;
         }
         NodeType::Text(text) => {
-            let id = components.len();
-            let mut children = Vec::new();
-            let y = match parent {
-                Some(parent_id) => {
-                    components[parent_id].rect.y + 40.0
-                }
-                None => 0.0
-            };
-            components.push(Component {
-                rect: Rect{ x: 0.0, y: y, width: 100.0, height: 20.0 },
+             components.push(Component {
+                rect: Rect{ x: 0.0, y: y, width: 100.0, height: 40.0 },
                 content: Some(Content::Text(text.to_string())),
 
-            });
-
-            for child in &node.children {
-                children.push(next_component(components, dom, *child, Some(id)));
-            }
-
-            return id;
+            });           
+        }
+        _ => {
+            // ;)
         }
     }
+
+    let mut last_child = None;
+    let mut height = 40.0;
+    for child_node in &node.children {
+        let child = next_component(components, dom, *child_node, Some(id), last_child);
+        height += components.last().unwrap().rect.height;
+        last_child = Some(child);
+    }
+
+    components[id].rect.height = height;
+
+    return id;
 }
