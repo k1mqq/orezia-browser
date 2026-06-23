@@ -2,6 +2,7 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use fontdue::Font;
+use fontdue::layout::{CoordinateSystem, LayoutSettings, TextStyle};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -92,13 +93,21 @@ impl Renderer {
     }
 
     fn draw_string(&mut self, string: String, x: usize, y: usize, size: f32) {
-        let mut x = x;
-        // let mut y = y;
-        for ch in string.chars() {
-            let metrics = self.font.metrics(ch, size);
-            self.draw_char(ch, x, y, size);
+        let mut font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
+        
+        font_layout.reset(&LayoutSettings::default());
+        // is this clone ok?
+        font_layout.append(&[self.font.clone()], &TextStyle::new(&string, size, 0));
+        for glyph in font_layout.glyphs() {
+            let (metrics, bitmap) = self.font.rasterize_config(glyph.key);
+            for (i, bit) in bitmap.iter().enumerate() {
+                let c = 255 - *bit;
 
-            x = x + metrics.advance_width as usize;
+                let x: usize = i % metrics.width + x + glyph.x as usize;
+                let y: usize = i / metrics.width + y + glyph.y as usize;
+
+                self.buffer[y * self.width as usize + x] = rgb(c, c, c);
+            }
         }
     }
 
