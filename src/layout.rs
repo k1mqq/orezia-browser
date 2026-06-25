@@ -1,7 +1,15 @@
+use fontdue::{Font, layout::{CoordinateSystem, TextStyle}};
+
 use crate::html_parser::{Dom, NodeId, NodeType};
 
 pub struct Layout {
     pub components: Vec<Component>,
+}
+
+pub struct LayoutContext<'a> {
+    pub font: &'a Font,
+    pub window_height: u32,
+    pub window_width: u32,
 }
 
 pub struct Component {
@@ -39,8 +47,8 @@ pub struct EdgeSize {
     pub bottom: f32,
 }
 
-impl Layout {
-    pub fn build(dom: &Dom) -> Self {
+impl<'a> Layout {
+    pub fn build(dom: &Dom, context: LayoutContext<'a>) -> Layout {
         let mut components = Vec::new();
 
         let body_id = dom.nodes.iter().position(|node|
@@ -51,10 +59,10 @@ impl Layout {
             }
         ).expect("no body element?");
 
-        next_component(&mut components, dom, body_id, None, None);
+        next_component(&mut components, dom, body_id, None, None, &context);
 
         Self {
-            components: components,
+            components,
         }
     }
 }
@@ -77,7 +85,7 @@ impl Dimentions {
     }
 }
 
-fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, parent: Option<ComponentId>, brother: Option<ComponentId>) -> Option<ComponentId> {
+fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, parent: Option<ComponentId>, brother: Option<ComponentId>, context: &LayoutContext) -> Option<ComponentId> {
     // println!("{}", node_id);
     let node = &dom.nodes[node_id];
     let id = components.len();
@@ -110,7 +118,7 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
                 "body" => {
                     Dimentions {
                         //                     :(          :(
-                        content: Rect { x: x + 8.0, y: y + 8.0, width: 100.0, height: 20.0},
+                        content: Rect { x: x + 8.0, y: y + 8.0, width: context.window_width as f32 - 8.0, height: 20.0},
                         margin: EdgeSize {
                             left: 8.0,
                             right: 8.0,
@@ -122,19 +130,19 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
                 }
                 "h1" => {
                     Dimentions {
-                        content: Rect { x: x, y: y, width: 100.0, height: 20.0 },
+                        content: Rect { x: x, y: y, width: 1000.0, height: 20.0 },
                         ..Default::default()
                     }
                 }
                 "p" | "a" => {
                     Dimentions {
-                        content: Rect { x: x, y: y, width: 100.0, height: 10.0 },
+                        content: Rect { x: x, y: y, width: 1000.0, height: 10.0 },
                         ..Default::default()
                     }
                 }
                 _ => {
                     Dimentions {
-                        content: Rect{ x: x, y: y, width: 100.0, height: 0.0},
+                        content: Rect{ x: x, y: y, width: 1000.0, height: 0.0},
                         ..Default::default()
                     }
                 }
@@ -145,9 +153,20 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
             });
         }
         NodeType::Text(text) => {
+            // recreate every time for no reason
+            // fix later
+            let mut font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
+            let font_layout_settings = fontdue::layout::LayoutSettings {
+                max_width: Some(1000.0),
+                ..Default::default()
+            };
+            font_layout.reset(&font_layout_settings);
+
+            font_layout.append(&[context.font], &TextStyle::new(&text, 20.0, 0));
+
             components.push(Component {
                 dimentions: Dimentions {
-                    content: Rect { x: x, y: y, width: 100.0, height: 20.0 },
+                    content: Rect { x: x, y: y, width: 1000.0, height: font_layout.height() },
                     padding: EdgeSize::default(),
                     border: EdgeSize::default(),
                     margin: EdgeSize::default(),
@@ -161,9 +180,9 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
     }
 
     let mut last_child = None;
-    let mut height = 40.0;
+    let mut height = components[id].dimentions.content.height;
     for child_node in &node.children {
-        let Some(child) = next_component(components, dom, *child_node, Some(id), last_child) else {
+        let Some(child) = next_component(components, dom, *child_node, Some(id), last_child, context) else {
             continue;
         };
         height += components.last().unwrap().dimentions.outer_height();

@@ -23,8 +23,6 @@ fn main()  -> Result<(), Box<dyn Error>> {
 
     println!("{:?}", dom);
 
-    let layout = layout::Layout::build(&dom);
-
-    renderer::render(layout);
+    renderer::render(dom);
     Ok(())
 }
