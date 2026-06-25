@@ -106,6 +106,15 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
         }
     };
 
+    let width = match parent {
+        Some(parent_id) => {
+            components[parent_id].dimentions.content.width
+        }
+        None => {
+            context.window_width as f32
+        }
+    };
+
     match &node.node_type {
         NodeType::Element { tag, attributes } => {
             if matches!(tag.as_str(), "script" | "style"){
@@ -118,7 +127,7 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
                 "body" => {
                     Dimentions {
                         //                     :(          :(
-                        content: Rect { x: x + 8.0, y: y + 8.0, width: context.window_width as f32 - 8.0, height: 20.0},
+                        content: Rect { x: x + 8.0, y: y + 8.0, width: width - 8.0, height: 20.0},
                         margin: EdgeSize {
                             left: 8.0,
                             right: 8.0,
@@ -130,19 +139,19 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
                 }
                 "h1" => {
                     Dimentions {
-                        content: Rect { x: x, y: y, width: 1000.0, height: 20.0 },
+                        content: Rect { x: x, y: y, width: width, height: 20.0 },
                         ..Default::default()
                     }
                 }
                 "p" | "a" => {
                     Dimentions {
-                        content: Rect { x: x, y: y, width: 1000.0, height: 10.0 },
+                        content: Rect { x: x, y: y, width: width, height: 10.0 },
                         ..Default::default()
                     }
                 }
                 _ => {
                     Dimentions {
-                        content: Rect{ x: x, y: y, width: 1000.0, height: 0.0},
+                        content: Rect{ x: x, y: y, width: width, height: 0.0},
                         ..Default::default()
                     }
                 }
@@ -157,7 +166,7 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
             // fix later
             let mut font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
             let font_layout_settings = fontdue::layout::LayoutSettings {
-                max_width: Some(1000.0),
+                max_width: Some(width),
                 ..Default::default()
             };
             font_layout.reset(&font_layout_settings);
@@ -166,7 +175,7 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
 
             components.push(Component {
                 dimentions: Dimentions {
-                    content: Rect { x: x, y: y, width: 1000.0, height: font_layout.height() },
+                    content: Rect { x: x, y: y, width: width, height: font_layout.height() },
                     padding: EdgeSize::default(),
                     border: EdgeSize::default(),
                     margin: EdgeSize::default(),
