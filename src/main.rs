@@ -17,6 +17,7 @@ fn main()  -> Result<(), Box<dyn Error>> {
         headers,
         String::from("")).send()?;
     println!("{}", &response.status);
+    println!("{:?}", &response.headers);
     println!("{}", &response.body);
 
     let dom = html_parser::parse( response.body);

@@ -90,7 +90,19 @@ impl Request{
 
         let response_headers = build_headers(&mut buffer)?;
 
-        let body = build_body(&mut buffer)?;
+        let body = if let Some(_) = response_headers.get("Transfer-Encoding") {
+            build_body_chunked(&mut buffer)?
+        } else if let Some(content_length) = response_headers.get("Content-Length") {
+            let length= usize::from_str_radix(&content_length, 10).map_err(
+                |_| HttpError::Parse {
+                    message: "invalid content-length".to_string(), 
+                    raw: content_length.to_string(),
+                }
+            )?;
+            build_body(&mut buffer, length)?
+        } else {
+            return Err(HttpError::Parse { raw: "".to_string(), message: "response did not have transfer-encoding or content-length".to_string() });
+        };
 
         Ok(Response{
             status: status_code,
@@ -100,7 +112,20 @@ impl Request{
     }
 }
 
-fn build_body(buffer: &mut BufReader<&TcpStream>) -> Result<String, HttpError> {
+fn build_body(buffer: &mut BufReader<&TcpStream>, length: usize) -> Result<String, HttpError> {
+    let mut body = String::new();
+    let mut buf = vec![0u8; length];
+    buffer.read_exact(&mut buf)?;
+
+    body.push_str(&String::from_utf8(buf).map_err(|_| HttpError::Parse{
+        raw: "".to_string(),
+        message: "invalid body".to_string(),
+    })?);
+    
+    Ok(body)
+}
+
+fn build_body_chunked(buffer: &mut BufReader<&TcpStream>) -> Result<String, HttpError> {
     let mut body = String::new();
 
     // more than 100 chunks -> error
