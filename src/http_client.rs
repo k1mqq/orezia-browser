@@ -2,6 +2,10 @@ use std::collections::HashMap;
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::net::TcpStream;
+use std::sync::Arc;
+
+use rustls::ClientConnection;
+use rustls::StreamOwned;
 
 #[derive(Debug)]
 pub enum HttpError {
@@ -49,6 +53,7 @@ impl Method{
 }
 pub struct Request {
     pub addr: String,
+    pub port: u16,
     pub path: String,
     pub method: Method,
     pub headers: HashMap<String, String>,
@@ -62,9 +67,9 @@ pub struct Response {
 }
 
 impl Request{
-    pub fn new(addr: String, path: String, method: Method, headers: HashMap<String, String>, body: String) -> Self{
+    pub fn new(addr: String, port: u16, path: String, method: Method, headers: HashMap<String, String>, body: String) -> Self{
         Self {
-            addr, path, method, headers, body
+            addr, port, path, method, headers, body
         }
     }
 
@@ -78,20 +83,29 @@ impl Request{
     }
 
     pub fn send(&self) -> Result<Response, HttpError> {
-        let mut stream = TcpStream::connect(&self.addr)?;
+        let root_store =rustls::RootCertStore::from_iter(
+            webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
+        );
+        let config = rustls::ClientConfig::builder()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+        let rc_config = Arc::new(config);
+        let client = ClientConnection::new(rc_config, self.addr.to_string().try_into().unwrap()).unwrap();
+        let stream = TcpStream::connect((self.addr.as_str(), self.port))?;
+        let mut owned_stream = StreamOwned::new(client, &stream);
         println!("connected!");
 
         let message= self.message();
 
-        stream.write_all(&message)?;
+        owned_stream.write_all(&message)?;
 
-        let mut buffer= BufReader::new(&stream);
-        let status_code = build_status_code(&mut buffer)?;
+        // let mut buffer= BufReader::new(&owned_stream);
+        let status_code = build_status_code(&mut owned_stream)?;
 
-        let response_headers = build_headers(&mut buffer)?;
+        let response_headers = build_headers(&mut owned_stream)?;
 
         let body = if let Some(_) = response_headers.get("Transfer-Encoding") {
-            build_body_chunked(&mut buffer)?
+            build_body_chunked(&mut owned_stream)?
         } else if let Some(content_length) = response_headers.get("Content-Length") {
             let length= usize::from_str_radix(&content_length, 10).map_err(
                 |_| HttpError::Parse {
@@ -99,7 +113,7 @@ impl Request{
                     raw: content_length.to_string(),
                 }
             )?;
-            build_body(&mut buffer, length)?
+            build_body(&mut owned_stream, length)?
         } else {
             return Err(HttpError::Parse { raw: "".to_string(), message: "response did not have transfer-encoding or content-length".to_string() });
         };
@@ -112,7 +126,7 @@ impl Request{
     }
 }
 
-fn build_body(buffer: &mut BufReader<&TcpStream>, length: usize) -> Result<String, HttpError> {
+fn build_body(buffer: &mut StreamOwned<ClientConnection, &TcpStream>, length: usize) -> Result<String, HttpError> {
     let mut body = String::new();
     let mut buf = vec![0u8; length];
     buffer.read_exact(&mut buf)?;
@@ -125,7 +139,7 @@ fn build_body(buffer: &mut BufReader<&TcpStream>, length: usize) -> Result<Strin
     Ok(body)
 }
 
-fn build_body_chunked(buffer: &mut BufReader<&TcpStream>) -> Result<String, HttpError> {
+fn build_body_chunked(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) -> Result<String, HttpError> {
     let mut body = String::new();
 
     // more than 100 chunks -> error
@@ -164,7 +178,7 @@ fn build_body_chunked(buffer: &mut BufReader<&TcpStream>) -> Result<String, Http
     Err(HttpError::Parse { raw: "".to_string(), message: "invalid body".to_string() })
 }
 
-fn build_status_code(buffer: &mut BufReader<&TcpStream>) -> Result<u16, HttpError> {
+fn build_status_code(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) -> Result<u16, HttpError> {
     let mut status_line = String::new();
     buffer.read_line(&mut status_line)?;
 
@@ -180,7 +194,7 @@ fn parse_status_line(status_line: String) -> Result<u16, HttpError> {
     Ok(i)
 }
 
-fn build_headers(buffer: &mut BufReader<&TcpStream>) -> Result<HashMap<String, String>, HttpError> {
+fn build_headers(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) -> Result<HashMap<String, String>, HttpError> {
     // more than 100 headers -> error
     // most browsers have 40KB limit on header size
     // does not care transfer encoding for now
