@@ -10,6 +10,7 @@ fn main()  -> Result<(), Box<dyn Error>> {
     let mut headers = HashMap::new();
     headers.insert("Host".to_string(), test.to_string());
     headers.insert("User-Agent".to_string(), "orezia-browser/0.0".to_string());
+    headers.insert("Accept-Encoding".to_string(), "identity".to_string());
     let response = http_client::Request::new(
         String::from(test),
         443,
@@ -23,7 +24,7 @@ fn main()  -> Result<(), Box<dyn Error>> {
 
     let dom = html_parser::parse( response.body);
 
-    println!("{:?}", dom);
+    dom.print(0, 0);
 
     renderer::render(dom);
     Ok(())

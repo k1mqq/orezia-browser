@@ -49,6 +49,29 @@ pub enum Token {
     Eof,
 }
 
+impl Dom {
+    pub fn print(&self, node: NodeId, depth: usize) {
+        let indent = "  ".repeat(depth);
+        match &self.nodes[node].node_type {
+            NodeType::Document => {
+
+            },
+            NodeType::Element { tag, attributes } => {
+                println!("{}| <{}>", indent, tag);
+                for (name, value) in attributes {
+                    println!("{}|    {}=\"{}\"", indent, name, value);
+                }
+                for &child in &self.nodes[node].children {
+                    self.print(child, depth + 1);
+                }
+            },
+            NodeType::Text(t) => {
+                println!("{}| \"{}\"", indent, t);
+            },
+        }
+    }
+}
+
 pub fn parse(input: String) -> Dom{
     let mut tokenizer = Tokenizer::new(&input);
     let mut tree_builder = TreeConstructor::new();
