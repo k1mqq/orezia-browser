@@ -126,13 +126,10 @@ impl TreeConstructor {
                 return false;
             }
             Token::EndTag { name, attributes, self_closing } => {
-                for node_id in self.open_elements.iter().rev() {
-                    if let NodeType::Element { tag, attributes}  = &self.dom.nodes[*node_id].node_type {
-                        if tag == name {
-                            self.open_elements.truncate(*node_id);
-                            return false;
-                        }
-                    }
+                if let Some(pos) = self.open_elements.iter().rposition(|&id| {
+                    matches!(&self.dom.nodes[id].node_type, NodeType::Element { tag, .. } if tag == name)
+                }) {
+                    self.open_elements.truncate(pos);
                 }
                 return false;
             }
