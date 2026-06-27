@@ -55,6 +55,9 @@ impl Renderer {
     fn draw_layout(&mut self, layout: Layout, font: &Font, font_layout: &mut fontdue::layout::Layout) {
         let draw_calls: Vec<(String, usize, usize, usize)> = layout.components
             .iter()
+            .filter(|c|
+                c.dimentions.content.x as u32 <= self.width && c.dimentions.content.y as u32 <= self.height
+            )
             .filter_map(|c| {
                 if let Some(text) = &c.text {
                     Some((text.clone(), c.dimentions.content.x as usize, c.dimentions.content.y as usize, c.dimentions.content.width as usize))
