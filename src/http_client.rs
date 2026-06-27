@@ -131,10 +131,11 @@ fn build_body(buffer: &mut StreamOwned<ClientConnection, &TcpStream>, length: us
     let mut buf = vec![0u8; length];
     buffer.read_exact(&mut buf)?;
 
-    body.push_str(&String::from_utf8(buf).map_err(|_| HttpError::Parse{
-        raw: "".to_string(),
-        message: "invalid body".to_string(),
-    })?);
+    body.push_str(&String::from_utf8_lossy(&buf));
+    // .map_err(|_| HttpError::Parse{
+    //     raw: "".to_string(),
+    //     message: "invalid body".to_string(),
+    // })?);
     
     Ok(body)
 }
