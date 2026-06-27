@@ -143,7 +143,7 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
                         ..Default::default()
                     }
                 }
-                "p" | "a" => {
+                "p" | "a" | "span"=> {
                     Dimentions {
                         content: Rect { x: x, y: y, width: width, height: 10.0 },
                         ..Default::default()
@@ -194,7 +194,7 @@ fn next_component(components: &mut Vec<Component>, dom: &Dom, node_id: NodeId, p
         let Some(child) = next_component(components, dom, *child_node, Some(id), last_child, context) else {
             continue;
         };
-        height += components.last().unwrap().dimentions.outer_height();
+        height += components[child].dimentions.outer_height();
         last_child = Some(child);
     }
 
