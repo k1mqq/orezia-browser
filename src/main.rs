@@ -4,10 +4,12 @@ mod renderer;
 mod layout;
 mod url;
 
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, env, error::Error};
 
 fn main()  -> Result<(), Box<dyn Error>> {
-    let url = url::URL::parse("https://news.ycombinator.com/item?id=48698617".to_string()).unwrap();
+    let args: Vec<String> = env::args().collect();
+
+    let url = url::URL::parse(args[1].to_string()).unwrap();
     println!("{:?}", url);
     let port = match url.port {
         Some(n) => n,
