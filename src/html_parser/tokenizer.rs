@@ -41,7 +41,7 @@ impl Tokenizer {
             current_attribute_name: "".to_string(),
             current_attribute_value: "".to_string(),
             current_attributes: Vec::new(),
-            state: TokenizerState::Data, 
+            state: TokenizerState::Data,
         }
     }
     pub fn next_token(&mut self) -> Token {
@@ -55,13 +55,13 @@ impl Tokenizer {
                     }
                     Some(c) => {
                         self.consume();
-                        return Token::Character(c)
-                    },
+                        return Token::Character(c);
+                    }
                     None => {
                         self.consume();
                         return Token::Eof;
                     }
-                }
+                },
                 TokenizerState::TagOpen => {
                     match ch {
                         Some('/') => {
@@ -108,14 +108,13 @@ impl Tokenizer {
                                 return Token::StartTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
-
-                            }else {
+                            } else {
                                 return Token::EndTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
                             }
                         }
@@ -130,43 +129,38 @@ impl Tokenizer {
                         }
                     }
                 }
-                TokenizerState::BeforeAttributeName => {
-                    match ch {
-                        Some('\t') | Some('\n') | Some(' ') => {
-                            self.consume();
-                        }
-                        Some('/') | Some('>') | None => {
-                            self.state = TokenizerState::AfterAttributeName;
-                        }
-                        Some(_) => {
-                            if !self.current_attribute_name.is_empty() {
-                                self.current_attributes.push((
-                                    self.current_attribute_name.clone(),
-                                    self.current_attribute_value.clone()
-                                ));
-                            }
-                            self.current_attribute_name = "".to_string();
-                            self.current_attribute_value = "".to_string();
-                            self.state = TokenizerState::AttributeName;
-                        }
+                TokenizerState::BeforeAttributeName => match ch {
+                    Some('\t') | Some('\n') | Some(' ') => {
+                        self.consume();
                     }
-
-                }
-                TokenizerState::AttributeName => {
-                    match ch {
-                        Some('\t') | Some('\n') | Some(' ') | Some('/') | None => {
-                            self.state = TokenizerState::AfterAttributeName;
-                        }
-                        Some('=') => {
-                            self.consume();
-                            self.state = TokenizerState::BeforeAttributeValue;
-                        }
-                        Some(c) => {
-                            self.consume();
-                            self.current_attribute_name.push(c.to_ascii_lowercase())
-                        }
+                    Some('/') | Some('>') | None => {
+                        self.state = TokenizerState::AfterAttributeName;
                     }
-                }
+                    Some(_) => {
+                        if !self.current_attribute_name.is_empty() {
+                            self.current_attributes.push((
+                                self.current_attribute_name.clone(),
+                                self.current_attribute_value.clone(),
+                            ));
+                        }
+                        self.current_attribute_name = "".to_string();
+                        self.current_attribute_value = "".to_string();
+                        self.state = TokenizerState::AttributeName;
+                    }
+                },
+                TokenizerState::AttributeName => match ch {
+                    Some('\t') | Some('\n') | Some(' ') | Some('/') | None => {
+                        self.state = TokenizerState::AfterAttributeName;
+                    }
+                    Some('=') => {
+                        self.consume();
+                        self.state = TokenizerState::BeforeAttributeValue;
+                    }
+                    Some(c) => {
+                        self.consume();
+                        self.current_attribute_name.push(c.to_ascii_lowercase())
+                    }
+                },
                 TokenizerState::AfterAttributeName => {
                     match ch {
                         Some('\t') | Some('\n') | Some(' ') => {
@@ -187,7 +181,7 @@ impl Tokenizer {
                             // last attribute is not pushed to this point
                             self.current_attributes.push((
                                 self.current_attribute_name.clone(),
-                                self.current_attribute_value.clone()
+                                self.current_attribute_value.clone(),
                             ));
                             if self.is_current_tag_open {
                                 return Token::StartTag {
@@ -207,7 +201,7 @@ impl Tokenizer {
                             if !self.current_attribute_name.is_empty() {
                                 self.current_attributes.push((
                                     self.current_attribute_name.clone(),
-                                    self.current_attribute_value.clone()
+                                    self.current_attribute_value.clone(),
                                 ));
                             }
                             self.current_attribute_name = "".to_string();
@@ -268,13 +262,13 @@ impl Tokenizer {
                                 return Token::StartTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
                             } else {
                                 return Token::EndTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
                             }
                         }
@@ -330,13 +324,13 @@ impl Tokenizer {
                                 return Token::StartTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
                             } else {
                                 return Token::EndTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
                             }
                         }
@@ -368,13 +362,13 @@ impl Tokenizer {
                                 return Token::StartTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
                             } else {
                                 return Token::EndTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
                             }
                         }
@@ -399,13 +393,13 @@ impl Tokenizer {
                                 return Token::StartTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
                             } else {
                                 return Token::EndTag {
                                     name: self.current_tag_name.clone(),
                                     attributes: self.put_attribute(),
-                                    self_closing: self.current_tag_self_closing
+                                    self_closing: self.current_tag_self_closing,
                                 };
                             }
                         }
@@ -433,7 +427,7 @@ impl Tokenizer {
     fn consume(&mut self) {
         self.pos += 1;
     }
-    fn current_char(&mut self) -> Option<char>{
+    fn current_char(&mut self) -> Option<char> {
         self.input.get(self.pos).copied()
     }
 }

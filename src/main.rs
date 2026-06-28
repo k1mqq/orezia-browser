@@ -1,24 +1,22 @@
-mod http_client;
 mod html_parser;
-mod renderer;
+mod http_client;
 mod layout;
+mod renderer;
 mod url;
 
 use std::{collections::HashMap, env, error::Error};
 
-fn main()  -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
 
     let url = url::URL::parse(args[1].to_string()).unwrap();
     println!("{:?}", url);
     let port = match url.port {
         Some(n) => n,
-        None => {
-            match url.scheme.as_str() {
-                "https" => 443,
-                _ => 80
-            }
-        }
+        None => match url.scheme.as_str() {
+            "https" => 443,
+            _ => 80,
+        },
     };
 
     let mut headers = HashMap::new();
@@ -31,12 +29,14 @@ fn main()  -> Result<(), Box<dyn Error>> {
         format!("/{}", url.path),
         http_client::Method::GET,
         headers,
-        String::from("")).send()?;
+        String::from(""),
+    )
+    .send()?;
     println!("{}", &response.status);
     println!("{:?}", &response.headers);
     println!("{}", &response.body);
 
-    let dom = html_parser::parse( response.body);
+    let dom = html_parser::parse(response.body);
 
     dom.print(0, 0);
 

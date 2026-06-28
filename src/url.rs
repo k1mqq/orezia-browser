@@ -36,7 +36,12 @@ impl URL {
         let mut pointer = 0;
         let mut state = ParserState::SchemeStart;
         let mut buffer = String::new();
-        let mut url = URL{ scheme: "".to_string(), host: "".to_string(), port: None, path:"".to_string() };
+        let mut url = URL {
+            scheme: "".to_string(),
+            host: "".to_string(),
+            port: None,
+            path: "".to_string(),
+        };
 
         loop {
             let Some(c) = text.chars().nth(pointer) else {
@@ -190,5 +195,24 @@ impl URL {
 }
 
 fn is_url_code(c: char) -> bool {
-    c.is_ascii_alphanumeric() | matches!(c, '!' | '$' | '&' | '\'' | '*' | '+' | ',' | '-' | '.' | '/' | ':' | ';' | '=' | '?' | '@' | '_' | '~')
+    c.is_ascii_alphanumeric()
+        | matches!(
+            c,
+            '!' | '$'
+                | '&'
+                | '\''
+                | '*'
+                | '+'
+                | ','
+                | '-'
+                | '.'
+                | '/'
+                | ':'
+                | ';'
+                | '='
+                | '?'
+                | '@'
+                | '_'
+                | '~'
+        )
 }

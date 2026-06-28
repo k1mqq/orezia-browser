@@ -10,17 +10,14 @@ use rustls::StreamOwned;
 #[derive(Debug)]
 pub enum HttpError {
     Connection(std::io::Error),
-    Parse{
-        raw: String,
-        message: String,
-    },
+    Parse { raw: String, message: String },
 }
 
 impl std::fmt::Display for HttpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             HttpError::Connection(e) => write!(f, "connection error: {e}"),
-            HttpError::Parse { raw, message} => write!(f, "{message}\nraw: {raw}"),
+            HttpError::Parse { raw, message } => write!(f, "{message}\nraw: {raw}"),
         }
     }
 }
@@ -32,13 +29,21 @@ impl From<std::io::Error> for HttpError {
 }
 impl std::error::Error for HttpError {}
 
-pub enum Method{
-    GET, HEAD, POST, PUT, DELETE, CONNECT, OPTIONS, TRACE, PATCH
+pub enum Method {
+    GET,
+    HEAD,
+    POST,
+    PUT,
+    DELETE,
+    CONNECT,
+    OPTIONS,
+    TRACE,
+    PATCH,
 }
 
-impl Method{
+impl Method {
     fn as_str(&self) -> &'static str {
-        match self{
+        match self {
             Self::GET => "GET",
             Self::HEAD => "HEAD",
             Self::POST => "POST",
@@ -66,36 +71,54 @@ pub struct Response {
     pub body: String,
 }
 
-impl Request{
-    pub fn new(addr: String, port: u16, path: String, method: Method, headers: HashMap<String, String>, body: String) -> Self{
+impl Request {
+    pub fn new(
+        addr: String,
+        port: u16,
+        path: String,
+        method: Method,
+        headers: HashMap<String, String>,
+        body: String,
+    ) -> Self {
         Self {
-            addr, port, path, method, headers, body
+            addr,
+            port,
+            path,
+            method,
+            headers,
+            body,
         }
     }
 
     fn message(&self) -> Vec<u8> {
         let mut field = String::new();
-        for (key ,value) in &self.headers {
+        for (key, value) in &self.headers {
             field.push_str(&format!("{}: {}\r\n", key, value).to_string());
         }
-        let message = format!("{} {} HTTP/1.1\r\n{}{}\r\n", self.method.as_str(), self.path, field, self.body);
+        let message = format!(
+            "{} {} HTTP/1.1\r\n{}{}\r\n",
+            self.method.as_str(),
+            self.path,
+            field,
+            self.body
+        );
         message.into_bytes()
     }
 
     pub fn send(&self) -> Result<Response, HttpError> {
-        let root_store =rustls::RootCertStore::from_iter(
-            webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
-        );
+        let root_store =
+            rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
         let config = rustls::ClientConfig::builder()
             .with_root_certificates(root_store)
             .with_no_client_auth();
         let rc_config = Arc::new(config);
-        let client = ClientConnection::new(rc_config, self.addr.to_string().try_into().unwrap()).unwrap();
+        let client =
+            ClientConnection::new(rc_config, self.addr.to_string().try_into().unwrap()).unwrap();
         let stream = TcpStream::connect((self.addr.as_str(), self.port))?;
         let mut owned_stream = StreamOwned::new(client, &stream);
         println!("connected!");
 
-        let message= self.message();
+        let message = self.message();
 
         owned_stream.write_all(&message)?;
 
@@ -107,18 +130,20 @@ impl Request{
         let body = if let Some(_) = response_headers.get("Transfer-Encoding") {
             build_body_chunked(&mut owned_stream)?
         } else if let Some(content_length) = response_headers.get("Content-Length") {
-            let length= usize::from_str_radix(&content_length, 10).map_err(
-                |_| HttpError::Parse {
-                    message: "invalid content-length".to_string(), 
+            let length =
+                usize::from_str_radix(&content_length, 10).map_err(|_| HttpError::Parse {
+                    message: "invalid content-length".to_string(),
                     raw: content_length.to_string(),
-                }
-            )?;
+                })?;
             build_body(&mut owned_stream, length)?
         } else {
-            return Err(HttpError::Parse { raw: "".to_string(), message: "response did not have transfer-encoding or content-length".to_string() });
+            return Err(HttpError::Parse {
+                raw: "".to_string(),
+                message: "response did not have transfer-encoding or content-length".to_string(),
+            });
         };
 
-        Ok(Response{
+        Ok(Response {
             status: status_code,
             headers: response_headers,
             body: body,
@@ -126,7 +151,10 @@ impl Request{
     }
 }
 
-fn build_body(buffer: &mut StreamOwned<ClientConnection, &TcpStream>, length: usize) -> Result<String, HttpError> {
+fn build_body(
+    buffer: &mut StreamOwned<ClientConnection, &TcpStream>,
+    length: usize,
+) -> Result<String, HttpError> {
     let mut body = String::new();
     let mut buf = vec![0u8; length];
     buffer.read_exact(&mut buf)?;
@@ -136,11 +164,13 @@ fn build_body(buffer: &mut StreamOwned<ClientConnection, &TcpStream>, length: us
     //     raw: "".to_string(),
     //     message: "invalid body".to_string(),
     // })?);
-    
+
     Ok(body)
 }
 
-fn build_body_chunked(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) -> Result<String, HttpError> {
+fn build_body_chunked(
+    buffer: &mut StreamOwned<ClientConnection, &TcpStream>,
+) -> Result<String, HttpError> {
     let mut body = String::new();
 
     // more than 100 chunks -> error
@@ -150,12 +180,10 @@ fn build_body_chunked(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) ->
 
         size_line = size_line.replace("\r\n", "");
 
-        let size= usize::from_str_radix(&size_line, 16).map_err(
-            |_| HttpError::Parse {
-                message: "Chunk size may be too big".to_string(), 
-                raw: size_line,
-            }
-        )?;
+        let size = usize::from_str_radix(&size_line, 16).map_err(|_| HttpError::Parse {
+            message: "Chunk size may be too big".to_string(),
+            raw: size_line,
+        })?;
 
         if size == 0 {
             let mut trailing = String::new();
@@ -170,16 +198,21 @@ fn build_body_chunked(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) ->
         let mut trailing = String::new();
         buffer.read_line(&mut trailing)?;
 
-        body.push_str(&String::from_utf8(buf).map_err(|_| HttpError::Parse{
+        body.push_str(&String::from_utf8(buf).map_err(|_| HttpError::Parse {
             raw: "".to_string(),
             message: "invalid body".to_string(),
         })?);
     }
 
-    Err(HttpError::Parse { raw: "".to_string(), message: "invalid body".to_string() })
+    Err(HttpError::Parse {
+        raw: "".to_string(),
+        message: "invalid body".to_string(),
+    })
 }
 
-fn build_status_code(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) -> Result<u16, HttpError> {
+fn build_status_code(
+    buffer: &mut StreamOwned<ClientConnection, &TcpStream>,
+) -> Result<u16, HttpError> {
     let mut status_line = String::new();
     buffer.read_line(&mut status_line)?;
 
@@ -190,12 +223,14 @@ fn parse_status_line(status_line: String) -> Result<u16, HttpError> {
     let v: Vec<&str> = status_line.split(" ").collect();
     let i: u16 = v[1].parse().map_err(|_| HttpError::Parse {
         raw: status_line,
-        message: "invalid status line".to_string()
+        message: "invalid status line".to_string(),
     })?;
     Ok(i)
 }
 
-fn build_headers(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) -> Result<HashMap<String, String>, HttpError> {
+fn build_headers(
+    buffer: &mut StreamOwned<ClientConnection, &TcpStream>,
+) -> Result<HashMap<String, String>, HttpError> {
     // more than 100 headers -> error
     // most browsers have 40KB limit on header size
     // does not care transfer encoding for now
@@ -204,7 +239,7 @@ fn build_headers(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) -> Resu
 
     for _ in 1..101 {
         let mut field_line = String::new();
-        buffer.read_line( &mut field_line)?;
+        buffer.read_line(&mut field_line)?;
 
         if field_line.replace("\r\n", "").is_empty() {
             valid_field = true;
@@ -215,15 +250,11 @@ fn build_headers(buffer: &mut StreamOwned<ClientConnection, &TcpStream>) -> Resu
     }
 
     match valid_field {
-        true => {
-            parse_field(field)
-        },
-        false => {
-            Err(HttpError::Parse{
-                message: "Too many headers.".to_string(),
-                raw: field,
-            })
-        }
+        true => parse_field(field),
+        false => Err(HttpError::Parse {
+            message: "Too many headers.".to_string(),
+            raw: field,
+        }),
     }
 }
 

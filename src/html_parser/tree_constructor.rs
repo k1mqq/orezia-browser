@@ -17,10 +17,10 @@ pub struct TreeConstructor {
 }
 
 impl TreeConstructor {
-    pub fn new() -> Self{
+    pub fn new() -> Self {
         TreeConstructor {
             // dom: Dom{ nodes: vec![Node{node_type:NodeType::Document,children:Vec::new(), parent: None }] },
-            dom: Dom{ nodes: Vec::new() },
+            dom: Dom { nodes: Vec::new() },
             mode: InsertionMode::Initial,
             open_elements: Vec::new(),
         }
@@ -111,7 +111,7 @@ impl TreeConstructor {
     //     // }
     // }
     // fn handle_after_head(&mut self, token: &Token) -> bool {
-        
+
     // }
     fn handle_in_body(&mut self, token: &Token) -> bool {
         match token {
@@ -119,13 +119,21 @@ impl TreeConstructor {
                 self.insert_character(*character);
                 return false;
             }
-            Token::StartTag { name, attributes, self_closing } => {
+            Token::StartTag {
+                name,
+                attributes,
+                self_closing,
+            } => {
                 let element = self.create_element(name.clone(), attributes.clone());
                 self.insert_element(element);
                 self.open_elements.push(element);
                 return false;
             }
-            Token::EndTag { name, attributes, self_closing } => {
+            Token::EndTag {
+                name,
+                attributes,
+                self_closing,
+            } => {
                 if let Some(pos) = self.open_elements.iter().rposition(|&id| {
                     matches!(&self.dom.nodes[id].node_type, NodeType::Element { tag, .. } if tag == name)
                 }) {
@@ -135,7 +143,7 @@ impl TreeConstructor {
             }
             Token::Eof => {
                 return false;
-            },
+            }
         }
     }
     // fn handle_after_body(&mut self, token: &Token) -> bool {
@@ -144,8 +152,11 @@ impl TreeConstructor {
 
     fn create_element(&mut self, name: String, attributes: Vec<(String, String)>) -> usize {
         let id = self.dom.nodes.len();
-        let element = Node{
-            node_type: NodeType::Element { tag: name, attributes: attributes },
+        let element = Node {
+            node_type: NodeType::Element {
+                tag: name,
+                attributes: attributes,
+            },
             children: Vec::new(),
             parent: None,
         };
@@ -167,17 +178,22 @@ impl TreeConstructor {
             }
         }
         // it must be safe
-        self.dom.nodes.get_mut(*current_node_id).unwrap().children.push(element_id);
+        self.dom
+            .nodes
+            .get_mut(*current_node_id)
+            .unwrap()
+            .children
+            .push(element_id);
     }
 
-    fn insert_character(&mut self, character:char) {
+    fn insert_character(&mut self, character: char) {
         let current_node_id = *self.open_elements.last().unwrap_or(&0);
         // Document node dont have Text node
         // or empty node
         if current_node_id == 0 {
             return;
         }
-        
+
         if let Some(&last_child) = self.dom.nodes[current_node_id].children.last() {
             // these are same
             // if let NodeType::Text(ref mut s) = self.dom.nodes[last_child].node_type {

@@ -13,15 +13,18 @@ pub struct Dom {
 pub struct Node {
     pub node_type: NodeType,
     pub children: Vec<NodeId>,
-    pub parent: Option<NodeId>
+    pub parent: Option<NodeId>,
 }
 
 pub type NodeId = usize;
 
 #[derive(Debug)]
-pub enum NodeType{
+pub enum NodeType {
     Document,
-    Element{ tag: String, attributes: Vec<(String, String)> },
+    Element {
+        tag: String,
+        attributes: Vec<(String, String)>,
+    },
     Text(String),
     // Comment(String),
 }
@@ -53,9 +56,7 @@ impl Dom {
     pub fn print(&self, node: NodeId, depth: usize) {
         let indent = "  ".repeat(depth);
         match &self.nodes[node].node_type {
-            NodeType::Document => {
-
-            },
+            NodeType::Document => {}
             NodeType::Element { tag, attributes } => {
                 println!("{}| <{}>", indent, tag);
                 for (name, value) in attributes {
@@ -64,15 +65,15 @@ impl Dom {
                 for &child in &self.nodes[node].children {
                     self.print(child, depth + 1);
                 }
-            },
+            }
             NodeType::Text(t) => {
                 println!("{}| \"{}\"", indent, t);
-            },
+            }
         }
     }
 }
 
-pub fn parse(input: String) -> Dom{
+pub fn parse(input: String) -> Dom {
     let mut tokenizer = Tokenizer::new(&input);
     let mut tree_builder = TreeConstructor::new();
 

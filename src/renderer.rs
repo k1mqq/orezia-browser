@@ -1,8 +1,8 @@
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use fontdue::{Font, Metrics};
 use fontdue::layout::{CoordinateSystem, LayoutSettings, TextStyle};
+use fontdue::{Font, Metrics};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -36,12 +36,28 @@ impl Renderer {
         }
     }
 
-    fn draw(&mut self, buffer: &mut [u32], layout: Layout, width: u32, height: u32, font: &Font, font_layout: &mut fontdue::layout::Layout){
+    fn draw(
+        &mut self,
+        buffer: &mut [u32],
+        layout: Layout,
+        width: u32,
+        height: u32,
+        font: &Font,
+        font_layout: &mut fontdue::layout::Layout,
+    ) {
         self.width = width;
         self.height = height;
         self.buffer = vec![u32::MAX; (width * height) as usize];
 
-        self.draw_string("Orezia by k1mq!".to_string(), 100, 200, 1000, 100.0, font, font_layout);
+        self.draw_string(
+            "Orezia by k1mq!".to_string(),
+            100,
+            200,
+            1000,
+            100.0,
+            font,
+            font_layout,
+        );
         self.draw_layout(layout, font, font_layout);
 
         for (i, pixel) in buffer.iter_mut().enumerate() {
@@ -52,20 +68,33 @@ impl Renderer {
         }
     }
 
-    fn draw_layout(&mut self, layout: Layout, font: &Font, font_layout: &mut fontdue::layout::Layout) {
-        let draw_calls: Vec<(String, usize, usize, usize)> = layout.components
+    fn draw_layout(
+        &mut self,
+        layout: Layout,
+        font: &Font,
+        font_layout: &mut fontdue::layout::Layout,
+    ) {
+        let draw_calls: Vec<(String, usize, usize, usize)> = layout
+            .components
             .iter()
-            .filter(|c|
-                c.dimentions.content.x as u32 <= self.width && c.dimentions.content.y as u32 <= self.height
-            )
+            .filter(|c| {
+                c.dimentions.content.x as u32 <= self.width
+                    && c.dimentions.content.y as u32 <= self.height
+            })
             .filter_map(|c| {
                 if let Some(text) = &c.text {
-                    Some((text.clone(), c.dimentions.content.x as usize, c.dimentions.content.y as usize, c.dimentions.content.width as usize))
+                    Some((
+                        text.clone(),
+                        c.dimentions.content.x as usize,
+                        c.dimentions.content.y as usize,
+                        c.dimentions.content.width as usize,
+                    ))
                 } else {
                     None
                 }
-            }).collect();
-        
+            })
+            .collect();
+
         for (text, x, y, width) in draw_calls {
             self.draw_string(text, x, y, width, 20.0, font, font_layout);
         }
@@ -86,7 +115,16 @@ impl Renderer {
     //     }
     // }
 
-    fn draw_string(&mut self, string: String, x: usize, y: usize, width: usize, size: f32, font: &Font, font_layout: &mut fontdue::layout::Layout) {
+    fn draw_string(
+        &mut self,
+        string: String,
+        x: usize,
+        y: usize,
+        width: usize,
+        size: f32,
+        font: &Font,
+        font_layout: &mut fontdue::layout::Layout,
+    ) {
         let layout_settings = LayoutSettings {
             max_width: Some(width as f32),
             ..Default::default()
@@ -111,7 +149,7 @@ impl Renderer {
         }
     }
 
-    fn pixel_at(&self, x: usize, y: usize) -> u32{
+    fn pixel_at(&self, x: usize, y: usize) -> u32 {
         self.buffer[y * self.width as usize + x]
     }
 }
@@ -133,14 +171,18 @@ impl App {
             dom: dom,
             font: font,
             font_layout: font_layout,
-            state: None
+            state: None,
         }
     }
 }
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window = Arc::new(event_loop.create_window(Window::default_attributes()).unwrap());
+        let window = Arc::new(
+            event_loop
+                .create_window(Window::default_attributes())
+                .unwrap(),
+        );
 
         let context = softbuffer::Context::new(Arc::clone(&window)).unwrap();
         let surface = softbuffer::Surface::new(&context, Arc::clone(&window)).unwrap();
@@ -152,13 +194,12 @@ impl ApplicationHandler for App {
         event_loop: &ActiveEventLoop,
         _window_id: winit::window::WindowId,
         event: WindowEvent,
-    )
-    {
+    ) {
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
                 event_loop.exit();
-            },
+            }
             WindowEvent::Resized(_) | WindowEvent::RedrawRequested => {
                 let Some((window, surface)) = self.state.as_mut() else {
                     return;
@@ -171,14 +212,13 @@ impl ApplicationHandler for App {
                     return;
                 }
 
-                surface.resize(
-                    NonZeroU32::new(w).unwrap(),
-                    NonZeroU32::new(h).unwrap(),
-                ).unwrap();
+                surface
+                    .resize(NonZeroU32::new(w).unwrap(), NonZeroU32::new(h).unwrap())
+                    .unwrap();
 
                 let mut buf = surface.buffer_mut().unwrap();
 
-                let layout_context = LayoutContext{
+                let layout_context = LayoutContext {
                     font: &self.font,
                     window_height: h,
                     window_width: w,
@@ -186,8 +226,9 @@ impl ApplicationHandler for App {
 
                 let layout = Layout::build(&self.dom, layout_context);
 
-                self.renderer.draw(&mut buf, layout, w, h, &self.font, &mut self.font_layout);
-                
+                self.renderer
+                    .draw(&mut buf, layout, w, h, &self.font, &mut self.font_layout);
+
                 buf.present().unwrap();
             }
             _ => (),
