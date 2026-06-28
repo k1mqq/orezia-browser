@@ -2,19 +2,31 @@ mod http_client;
 mod html_parser;
 mod renderer;
 mod layout;
+mod url;
 
 use std::{collections::HashMap, error::Error};
 
 fn main()  -> Result<(), Box<dyn Error>> {
-    let test = "www.yahoo.co.jp";
+    let url = url::URL::parse("https://news.ycombinator.com/item?id=48698617".to_string()).unwrap();
+    println!("{:?}", url);
+    let port = match url.port {
+        Some(n) => n,
+        None => {
+            match url.scheme.as_str() {
+                "https" => 443,
+                _ => 80
+            }
+        }
+    };
+
     let mut headers = HashMap::new();
-    headers.insert("Host".to_string(), test.to_string());
+    headers.insert("Host".to_string(), url.host.to_string());
     headers.insert("User-Agent".to_string(), "orezia-browser/0.0".to_string());
     headers.insert("Accept-Encoding".to_string(), "identity".to_string());
     let response = http_client::Request::new(
-        String::from(test),
-        443,
-        String::from("/"),
+        String::from(&url.host),
+        port,
+        format!("/{}", url.path),
         http_client::Method::GET,
         headers,
         String::from("")).send()?;
