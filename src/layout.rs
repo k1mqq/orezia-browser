@@ -1,11 +1,9 @@
-use std::default;
-
 use fontdue::{
     Font,
     layout::{CoordinateSystem, TextStyle},
 };
 
-use crate::html_parser::{Dom, NodeId, NodeType};
+use crate::html_parser::{Dom, Node, NodeId, NodeType};
 
 pub struct Layout {
     pub components: Vec<Component>,
@@ -111,117 +109,35 @@ fn next_component(
     components: &mut Vec<Component>,
     dom: &Dom,
     node_id: NodeId,
-    parent: Option<ComponentId>,
-    brother: Option<ComponentId>,
+    parent_id: Option<ComponentId>,
+    brother_id: Option<ComponentId>,
     context: &LayoutContext,
 ) -> Option<ComponentId> {
     // println!("{}", node_id);
     let node = &dom.nodes[node_id];
     let id = components.len();
 
-    let (margin, text, box_type) = match &node.node_type {
-        NodeType::Element { tag, attributes } => {
-            let mut margin = EdgeSize::default();
-            let mut box_type = BoxType::Block;
-            if matches!(tag.as_str(), "script" | "style") {
-                return None;
-            }
-            let dimentions = match tag.as_str() {
-                "script" | "style" => {
-                    return None;
-                }
-                "body" => {
-                    margin = EdgeSize {
-                        left: 8.0,
-                        right: 8.0,
-                        top: 8.0,
-                        bottom: 8.0,
-                    };
-                }
-                "a" | "span" => {
-                    box_type = BoxType::Inline;
-                }
-                _ => {}
-            };
-            (margin, None, box_type)
-        }
-        NodeType::Text(text) => (EdgeSize::default(), Some(text.to_string()), BoxType::Inline),
-        _ => {
-            return None;
-        }
+    let brother = if let Some(id) = brother_id {
+        components.get(id)
+    } else {
+        None
     };
 
-    let (x, y) = match box_type {
-        BoxType::Block => match brother {
-            Some(brother_id) => (
-                components[brother_id].dimentions.content.x,
-                components[brother_id].dimentions.content.y
-                    + components[brother_id].dimentions.outer_height(),
-            ),
-            None => match parent {
-                Some(parent_id) => (
-                    components[parent_id].dimentions.content.x
-                        + components[parent_id].dimentions.padding.left,
-                    components[parent_id].dimentions.content.y
-                        + components[parent_id].dimentions.padding.top,
-                ),
-                None => (0.0, 0.0),
-            },
-        },
-        BoxType::Inline => {
-            match brother {
-                Some(brother_id) => {
-                    (
-                        // imperfect
-                        components[brother_id].dimentions.content.x
-                            + components[brother_id].dimentions.outer_width(),
-                        components[brother_id].dimentions.content.y,
-                    )
-                }
-                None => match parent {
-                    Some(parent_id) => (
-                        components[parent_id].dimentions.content.x
-                            + components[parent_id].dimentions.padding.left,
-                        components[parent_id].dimentions.content.y
-                            + components[parent_id].dimentions.padding.top,
-                    ),
-                    None => (0.0, 0.0),
-                },
-            }
-        }
+    let parent = if let Some(id) = parent_id {
+        components.get(id)
+    } else {
+        None
     };
 
-    let width = match box_type {
-        BoxType::Block => match parent {
-            Some(parent_id) => components[parent_id].dimentions.content.width,
-            None => context.window_width as f32,
-        },
-        BoxType::Inline => match &text {
-            Some(text) => text
-                .chars()
-                .map(|c| {
-                    let metrics = context.font.metrics(c, 20.0);
-                    metrics.advance_width.ceil()
-                })
-                .sum(),
-            None => 0.0,
-        },
-    };
+    let margin = calc_margin(node);
+    let text = node.get_text();
+    let box_type = node.box_type();
 
-    let height = match &text {
-        Some(text) => {
-            let mut font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
-            let font_layout_settings = fontdue::layout::LayoutSettings {
-                // max_width: Some(width),
-                ..Default::default()
-            };
-            font_layout.reset(&font_layout_settings);
+    let (x, y) = calc_pos(node, brother, parent);
 
-            font_layout.append(&[context.font], &TextStyle::new(&text, 20.0, 0));
-            font_layout.height()
-        }
-        None => 0.0,
-    };
+    let width = calc_width(node, parent, context);
+
+    let height = calc_height(node, context);
 
     components.push(Component {
         dimentions: Dimentions {
@@ -234,7 +150,7 @@ fn next_component(
             margin: margin,
             ..Default::default()
         },
-        text: text,
+        text: text.cloned(),
         box_type: box_type.clone(),
     });
 
@@ -264,4 +180,105 @@ fn next_component(
     components[id].dimentions.content.height = height;
 
     return Some(id);
+}
+
+fn calc_margin(node: &Node) -> EdgeSize {
+    match &node.node_type {
+        NodeType::Element { tag, attributes: _ } => {
+            if matches!(tag.as_str(), "script" | "style") {
+                return EdgeSize::default();
+            }
+            match tag.as_str() {
+                "script" | "style" => {
+                    return EdgeSize::default();
+                }
+                "body" => {
+                    return EdgeSize {
+                        left: 8.0,
+                        right: 8.0,
+                        top: 8.0,
+                        bottom: 8.0,
+                    };
+                }
+                _ => {
+                    return EdgeSize::default();
+                }
+            };
+        }
+        _ => {
+            return EdgeSize::default();
+        }
+    }
+}
+
+fn calc_pos(node: &Node, brother: Option<&Component>, parent: Option<&Component>) -> (f32, f32) {
+    match node.box_type() {
+        BoxType::Block => match brother {
+            Some(brother) => (
+                brother.dimentions.content.x,
+                brother.dimentions.content.y + brother.dimentions.outer_height(),
+            ),
+            None => match parent {
+                Some(parent) => (
+                    parent.dimentions.content.x + parent.dimentions.padding.left,
+                    parent.dimentions.content.y + parent.dimentions.padding.top,
+                ),
+                None => (0.0, 0.0),
+            },
+        },
+        BoxType::Inline => {
+            match brother {
+                Some(brother) => {
+                    (
+                        // imperfect
+                        brother.dimentions.content.x + brother.dimentions.outer_width(),
+                        brother.dimentions.content.y,
+                    )
+                }
+                None => match parent {
+                    Some(parent) => (
+                        parent.dimentions.content.x + parent.dimentions.padding.left,
+                        parent.dimentions.content.y + parent.dimentions.padding.top,
+                    ),
+                    None => (0.0, 0.0),
+                },
+            }
+        }
+    }
+}
+
+fn calc_width(node: &Node, parent: Option<&Component>, context: &LayoutContext) -> f32 {
+    match node.box_type() {
+        BoxType::Block => match parent {
+            Some(parent) => parent.dimentions.content.width,
+            None => context.window_width as f32,
+        },
+        BoxType::Inline => match &node.get_text() {
+            Some(text) => text
+                .chars()
+                .map(|c| {
+                    let metrics = context.font.metrics(c, 20.0);
+                    metrics.advance_width.ceil()
+                })
+                .sum(),
+            None => 0.0,
+        },
+    }
+}
+
+fn calc_height(node: &Node, context: &LayoutContext) -> f32 {
+    match node.get_text() {
+        Some(text) => {
+            let mut font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
+            let font_layout_settings = fontdue::layout::LayoutSettings {
+                // max_width: Some(width),
+                ..Default::default()
+            };
+            font_layout.reset(&font_layout_settings);
+
+            font_layout.append(&[context.font], &TextStyle::new(&text, 20.0, 0));
+            font_layout.height()
+        }
+        None => 0.0,
+    }
 }

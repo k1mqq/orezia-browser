@@ -73,6 +73,30 @@ impl Dom {
     }
 }
 
+impl Node {
+    pub fn get_text(&self) -> Option<&String> {
+        if let NodeType::Text(t) = &self.node_type {
+            return Some(t);
+        } else {
+            return None;
+        }
+    }
+
+    pub fn box_type(&self) -> crate::layout::BoxType {
+        match &self.node_type {
+            NodeType::Element { tag, attributes } => {
+                if matches!(tag.as_str(), "a" | "span") {
+                    return crate::layout::BoxType::Inline;
+                } else {
+                    return crate::layout::BoxType::Block;
+                }
+            }
+            NodeType::Text(_) => return crate::layout::BoxType::Inline,
+            _ => crate::layout::BoxType::Block,
+        }
+    }
+}
+
 pub fn parse(input: String) -> Dom {
     let mut tokenizer = Tokenizer::new(&input);
     let mut tree_builder = TreeConstructor::new();
