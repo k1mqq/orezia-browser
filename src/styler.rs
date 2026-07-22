@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    html_parser::{self, Dom, Node, NodeId, NodeType},
+    html_parser::{Dom, NodeId, NodeType},
     styler::StyleValue::{Keyword, Length},
 };
 
@@ -10,7 +10,7 @@ pub struct StyledTree {
 }
 
 pub struct StyledNode {
-    pub node: NodeType,
+    pub dom_node_type: NodeType,
     pub styles: HashMap<String, StyleValue>,
     pub children: Vec<StyledNodeId>,
 }
@@ -23,20 +23,20 @@ pub struct StyledNode {
 //     Text(String),
 // }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum StyleValue {
     Keyword(String),
     Length(f32, Unit),
     ColorValue(Color),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Unit {
     Px,
     // Percent,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Color {
     r: u8,
     g: u8,
@@ -45,6 +45,16 @@ pub struct Color {
 }
 
 type StyledNodeId = usize;
+
+impl StyledNode {
+    pub fn get_text(&self) -> Option<&String> {
+        if let NodeType::Text(t) = &self.dom_node_type {
+            return Some(t);
+        } else {
+            return None;
+        }
+    }
+}
 
 impl StyledTree {
     pub fn build(dom: &Dom) -> StyledTree {
@@ -72,15 +82,23 @@ fn next_node(
     nodes: &mut Vec<StyledNode>,
     dom: &Dom,
     node_id: NodeId,
-    parent: Option<StyledNodeId>,
+    parent_id: Option<StyledNodeId>,
 ) -> StyledNodeId {
     let node = &dom.nodes[node_id];
     let id = nodes.len();
-    let mut styles = match parent {
-        Some(parent) => nodes[parent].styles.clone(),
+    let mut styles = match parent_id {
+        Some(parent) => {
+            nodes[parent].children.push(id);
+
+            nodes[parent]
+                .styles
+                .iter()
+                .filter(|(k, _)| is_inheritable(k))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect()
+        }
         None => HashMap::new(),
     };
-    let mut children_id = Vec::new();
 
     match &node.node_type {
         NodeType::Element { tag, attributes } => {
@@ -128,18 +146,28 @@ fn next_node(
                 }
             }
         }
-        NodeType::Text(text) => {}
-    }
-
-    for child in &node.children {
-        children_id.push(next_node(nodes, dom, *child, Some(id)));
+        NodeType::Text(_) => {
+            styles.insert(
+                "display".to_string(),
+                StyleValue::Keyword("inline".to_string()),
+            );
+        }
+        _ => {}
     }
 
     nodes.push(StyledNode {
-        node: node.node_type.clone(),
+        dom_node_type: node.node_type.clone(),
         styles: styles,
-        children: children_id,
+        children: Vec::new(),
     });
 
+    for child in &node.children {
+        next_node(nodes, dom, *child, Some(id));
+    }
+
     id
+}
+
+fn is_inheritable(key: &str) -> bool {
+    !matches!(key, "margin" | "padding" | "width" | "height" | "display")
 }

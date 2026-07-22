@@ -2,6 +2,7 @@ mod html_parser;
 mod http_client;
 mod layout;
 mod renderer;
+mod styler;
 mod url;
 
 use std::{collections::HashMap, env, error::Error};

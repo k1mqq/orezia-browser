@@ -3,7 +3,10 @@ use fontdue::{
     layout::{CoordinateSystem, TextStyle},
 };
 
-use crate::html_parser::{Dom, Node, NodeId, NodeType};
+use crate::styler::StyleValue;
+use crate::styler::StyledTree;
+use crate::styler::Unit;
+use crate::{html_parser::NodeId, styler::StyledNode};
 
 pub struct Layout {
     pub components: Vec<Component>,
@@ -58,22 +61,10 @@ pub struct EdgeSize {
 }
 
 impl<'a> Layout {
-    pub fn build(dom: &Dom, context: LayoutContext<'a>) -> Layout {
+    pub fn build(styled_tree: &StyledTree, context: LayoutContext<'a>) -> Layout {
         let mut components = Vec::new();
 
-        let body_id = dom
-            .nodes
-            .iter()
-            .position(|node| {
-                if let NodeType::Element { tag, attributes: _ } = &node.node_type {
-                    tag == "body"
-                } else {
-                    false
-                }
-            })
-            .expect("no body element?");
-
-        next_component(&mut components, dom, body_id, None, None, &context);
+        next_component(&mut components, styled_tree, 0, None, None, &context);
 
         Self { components }
     }
@@ -107,14 +98,14 @@ impl Dimentions {
 
 fn next_component(
     components: &mut Vec<Component>,
-    dom: &Dom,
+    styled_tree: &StyledTree,
     node_id: NodeId,
     parent_id: Option<ComponentId>,
     brother_id: Option<ComponentId>,
     context: &LayoutContext,
 ) -> Option<ComponentId> {
     // println!("{}", node_id);
-    let node = &dom.nodes[node_id];
+    let node = &styled_tree.nodes[node_id];
     let id = components.len();
 
     let brother = if let Some(id) = brother_id {
@@ -131,7 +122,7 @@ fn next_component(
 
     let margin = calc_margin(node);
     let text = node.get_text();
-    let box_type = node.box_type();
+    let box_type = box_type(node);
 
     let (x, y) = calc_pos(node, brother, parent);
 
@@ -158,9 +149,14 @@ fn next_component(
     let mut height = components[id].dimentions.content.height;
     let mut width = components[id].dimentions.content.width;
     for child_node in &node.children {
-        let Some(child) =
-            next_component(components, dom, *child_node, Some(id), last_child, context)
-        else {
+        let Some(child) = next_component(
+            components,
+            styled_tree,
+            *child_node,
+            Some(id),
+            last_child,
+            context,
+        ) else {
             continue;
         };
         match box_type {
@@ -182,37 +178,25 @@ fn next_component(
     return Some(id);
 }
 
-fn calc_margin(node: &Node) -> EdgeSize {
-    match &node.node_type {
-        NodeType::Element { tag, attributes: _ } => {
-            if matches!(tag.as_str(), "script" | "style") {
-                return EdgeSize::default();
-            }
-            match tag.as_str() {
-                "script" | "style" => {
-                    return EdgeSize::default();
-                }
-                "body" => {
-                    return EdgeSize {
-                        left: 8.0,
-                        right: 8.0,
-                        top: 8.0,
-                        bottom: 8.0,
-                    };
-                }
-                _ => {
-                    return EdgeSize::default();
-                }
-            };
-        }
-        _ => {
-            return EdgeSize::default();
-        }
+fn calc_margin(node: &StyledNode) -> EdgeSize {
+    if let Some(StyleValue::Length(l, Unit::Px)) = node.styles.get("margin") {
+        return EdgeSize {
+            left: *l,
+            right: *l,
+            top: *l,
+            bottom: *l,
+        };
+    } else {
+        return EdgeSize::default();
     }
 }
 
-fn calc_pos(node: &Node, brother: Option<&Component>, parent: Option<&Component>) -> (f32, f32) {
-    match node.box_type() {
+fn calc_pos(
+    node: &StyledNode,
+    brother: Option<&Component>,
+    parent: Option<&Component>,
+) -> (f32, f32) {
+    match box_type(node) {
         BoxType::Block => match brother {
             Some(brother) => (
                 brother.dimentions.content.x,
@@ -247,8 +231,8 @@ fn calc_pos(node: &Node, brother: Option<&Component>, parent: Option<&Component>
     }
 }
 
-fn calc_width(node: &Node, parent: Option<&Component>, context: &LayoutContext) -> f32 {
-    match node.box_type() {
+fn calc_width(node: &StyledNode, parent: Option<&Component>, context: &LayoutContext) -> f32 {
+    match box_type(node) {
         BoxType::Block => match parent {
             Some(parent) => parent.dimentions.content.width,
             None => context.window_width as f32,
@@ -266,7 +250,7 @@ fn calc_width(node: &Node, parent: Option<&Component>, context: &LayoutContext) 
     }
 }
 
-fn calc_height(node: &Node, context: &LayoutContext) -> f32 {
+fn calc_height(node: &StyledNode, context: &LayoutContext) -> f32 {
     match node.get_text() {
         Some(text) => {
             let mut font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
@@ -280,5 +264,20 @@ fn calc_height(node: &Node, context: &LayoutContext) -> f32 {
             font_layout.height()
         }
         None => 0.0,
+    }
+}
+
+fn box_type(node: &StyledNode) -> BoxType {
+    if let Some(StyleValue::Keyword(t)) = node.styles.get("display") {
+        match t.as_str() {
+            "inline" => {
+                return crate::layout::BoxType::Inline;
+            }
+            _ => {
+                return crate::layout::BoxType::Block;
+            }
+        }
+    } else {
+        return crate::layout::BoxType::Block;
     }
 }

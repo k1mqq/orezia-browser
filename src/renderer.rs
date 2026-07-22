@@ -11,6 +11,7 @@ use winit::window::Window;
 
 use crate::html_parser::Dom;
 use crate::layout::{Layout, LayoutContext};
+use crate::styler::StyledTree;
 
 struct Renderer {
     buffer: Vec<u32>,
@@ -200,7 +201,9 @@ impl ApplicationHandler for App {
                     window_width: w,
                 };
 
-                let layout = Layout::build(&self.dom, layout_context);
+                let styled_tree = StyledTree::build(&self.dom);
+
+                let layout = Layout::build(&styled_tree, layout_context);
 
                 self.renderer.draw(&mut buf, layout, w, h);
 
