@@ -1,3 +1,4 @@
+mod app;
 mod html_parser;
 mod http_client;
 mod layout;
@@ -41,6 +42,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     dom.print(0, 0);
 
-    renderer::render(dom);
+    app::init(dom);
     Ok(())
 }

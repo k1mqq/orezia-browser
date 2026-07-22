@@ -1,37 +1,23 @@
 use std::collections::HashMap;
-use std::num::NonZeroU32;
-use std::sync::Arc;
 
 use fontdue::layout::{CoordinateSystem, GlyphRasterConfig, LayoutSettings, TextStyle};
 use fontdue::{Font, Metrics};
-use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::Window;
 
-use crate::html_parser::Dom;
-use crate::layout::{Layout, LayoutContext};
-use crate::styler::StyledTree;
+use crate::layout::Layout;
 
-struct Renderer {
+pub struct Renderer {
     buffer: Vec<u32>,
-    fonts: Vec<Font>,
+    pub fonts: Vec<Font>,
     font_layout: fontdue::layout::Layout,
     font_cache: HashMap<GlyphRasterConfig, (Metrics, Vec<u8>)>,
     width: u32,
     height: u32,
 }
 
-struct App {
-    renderer: Renderer,
-    dom: Dom,
-    state: Option<(Arc<Window>, softbuffer::Surface<Arc<Window>, Arc<Window>>)>,
-}
-
 impl Renderer {
     // it is unusable when initialized, because width and height are zero
     // draw is called with width and height, so it's ok
-    fn new() -> Self {
+    pub fn new() -> Self {
         let font = include_bytes!("../resources/NotoSansCJKjp-Regular.otf") as &[u8];
         let settings = fontdue::FontSettings {
             scale: 200.0,
@@ -51,7 +37,7 @@ impl Renderer {
         }
     }
 
-    fn draw(&mut self, buffer: &mut [u32], layout: Layout, width: u32, height: u32) {
+    pub fn draw(&mut self, buffer: &mut [u32], layout: Layout, width: u32, height: u32) {
         self.width = width;
         self.height = height;
         self.buffer = vec![u32::MAX; (width * height) as usize];
@@ -143,87 +129,6 @@ impl Renderer {
     }
 }
 
-impl App {
-    fn new(renderer: Renderer, dom: Dom) -> Self {
-        Self {
-            renderer: renderer,
-            dom: dom,
-            state: None,
-        }
-    }
-}
-
-impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window = Arc::new(
-            event_loop
-                .create_window(Window::default_attributes())
-                .unwrap(),
-        );
-
-        let context = softbuffer::Context::new(Arc::clone(&window)).unwrap();
-        let surface = softbuffer::Surface::new(&context, Arc::clone(&window)).unwrap();
-
-        self.state = Some((window, surface));
-    }
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        _window_id: winit::window::WindowId,
-        event: WindowEvent,
-    ) {
-        match event {
-            WindowEvent::CloseRequested => {
-                println!("The close button was pressed; stopping");
-                event_loop.exit();
-            }
-            WindowEvent::Resized(_) | WindowEvent::RedrawRequested => {
-                let Some((window, surface)) = self.state.as_mut() else {
-                    return;
-                };
-
-                let size = window.inner_size();
-
-                let (w, h) = (size.width, size.height);
-                if w == 0 || h == 0 {
-                    return;
-                }
-
-                surface
-                    .resize(NonZeroU32::new(w).unwrap(), NonZeroU32::new(h).unwrap())
-                    .unwrap();
-
-                let mut buf = surface.buffer_mut().unwrap();
-
-                let layout_context = LayoutContext {
-                    font: &self.renderer.fonts[0],
-                    window_height: h,
-                    window_width: w,
-                };
-
-                let styled_tree = StyledTree::build(&self.dom);
-
-                let layout = Layout::build(&styled_tree, layout_context);
-
-                self.renderer.draw(&mut buf, layout, w, h);
-
-                buf.present().unwrap();
-            }
-            _ => (),
-        }
-    }
-}
-
 fn rgb(r: u8, g: u8, b: u8) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
-}
-
-pub fn render(dom: Dom) {
-    let event_loop = EventLoop::new().unwrap();
-    event_loop.set_control_flow(ControlFlow::Wait);
-
-    let renderer = Renderer::new();
-    let mut app = App::new(renderer, dom);
-
-    event_loop.run_app(&mut app).unwrap();
 }
