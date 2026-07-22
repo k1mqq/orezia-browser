@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use fontdue::layout::{CoordinateSystem, LayoutSettings, TextStyle};
+use fontdue::layout::{CoordinateSystem, GlyphRasterConfig, LayoutSettings, TextStyle};
 use fontdue::{Font, Metrics};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
@@ -13,6 +14,9 @@ use crate::layout::{Layout, LayoutContext};
 
 struct Renderer {
     buffer: Vec<u32>,
+    fonts: Vec<Font>,
+    font_layout: fontdue::layout::Layout,
+    font_cache: HashMap<GlyphRasterConfig, (Metrics, Vec<u8>)>,
     width: u32,
     height: u32,
 }
@@ -20,8 +24,6 @@ struct Renderer {
 struct App {
     renderer: Renderer,
     dom: Dom,
-    font: Font,
-    font_layout: fontdue::layout::Layout,
     state: Option<(Arc<Window>, softbuffer::Surface<Arc<Window>, Arc<Window>>)>,
 }
 
@@ -29,36 +31,32 @@ impl Renderer {
     // it is unusable when initialized, because width and height are zero
     // draw is called with width and height, so it's ok
     fn new() -> Self {
+        let font = include_bytes!("../resources/NotoSansCJKjp-Regular.otf") as &[u8];
+        let settings = fontdue::FontSettings {
+            scale: 200.0,
+            ..fontdue::FontSettings::default()
+        };
+
+        let font = Font::from_bytes(font, settings).unwrap();
+
+        let font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
         Self {
             buffer: Vec::new(),
+            fonts: vec![font],
+            font_layout: font_layout,
+            font_cache: HashMap::new(),
             width: 0,
             height: 0,
         }
     }
 
-    fn draw(
-        &mut self,
-        buffer: &mut [u32],
-        layout: Layout,
-        width: u32,
-        height: u32,
-        font: &Font,
-        font_layout: &mut fontdue::layout::Layout,
-    ) {
+    fn draw(&mut self, buffer: &mut [u32], layout: Layout, width: u32, height: u32) {
         self.width = width;
         self.height = height;
         self.buffer = vec![u32::MAX; (width * height) as usize];
 
-        self.draw_string(
-            "Orezia by k1mq!".to_string(),
-            100,
-            200,
-            1000,
-            100.0,
-            font,
-            font_layout,
-        );
-        self.draw_layout(layout, font, font_layout);
+        self.draw_string("Orezia by k1mq!".to_string(), 100, 200, 1000, 100.0);
+        self.draw_layout(layout);
 
         for (i, pixel) in buffer.iter_mut().enumerate() {
             let x = i % width as usize;
@@ -68,12 +66,7 @@ impl Renderer {
         }
     }
 
-    fn draw_layout(
-        &mut self,
-        layout: Layout,
-        font: &Font,
-        font_layout: &mut fontdue::layout::Layout,
-    ) {
+    fn draw_layout(&mut self, layout: Layout) {
         let draw_calls: Vec<(String, usize, usize, usize)> = layout
             .components
             .iter()
@@ -96,7 +89,7 @@ impl Renderer {
             .collect();
 
         for (text, x, y, width) in draw_calls {
-            self.draw_string(text, x, y, width, 20.0, font, font_layout);
+            self.draw_string(text, x, y, width, 20.0);
         }
     }
 
@@ -115,25 +108,20 @@ impl Renderer {
     //     }
     // }
 
-    fn draw_string(
-        &mut self,
-        string: String,
-        x: usize,
-        y: usize,
-        width: usize,
-        size: f32,
-        font: &Font,
-        font_layout: &mut fontdue::layout::Layout,
-    ) {
+    fn draw_string(&mut self, string: String, x: usize, y: usize, width: usize, size: f32) {
         let layout_settings = LayoutSettings {
             max_width: Some(width as f32),
             ..Default::default()
         };
-        font_layout.reset(&layout_settings);
-        // is this clone ok?
-        font_layout.append(&[font.clone()], &TextStyle::new(&string, size, 0));
-        for glyph in font_layout.glyphs() {
-            let (metrics, bitmap) = font.rasterize_config(glyph.key);
+        self.font_layout.reset(&layout_settings);
+        // no longer cloned font
+        self.font_layout
+            .append(self.fonts.as_slice(), &TextStyle::new(&string, size, 0));
+        for glyph in self.font_layout.glyphs() {
+            let (metrics, bitmap) = self
+                .font_cache
+                .entry(glyph.key)
+                .or_insert_with(|| self.fonts[0].rasterize_config(glyph.key));
             for (i, bit) in bitmap.iter().enumerate() {
                 let c = 255 - *bit;
 
@@ -156,21 +144,9 @@ impl Renderer {
 
 impl App {
     fn new(renderer: Renderer, dom: Dom) -> Self {
-        let font = include_bytes!("../resources/NotoSansCJKjp-Regular.otf") as &[u8];
-        let settings = fontdue::FontSettings {
-            scale: 200.0,
-            ..fontdue::FontSettings::default()
-        };
-
-        let font = Font::from_bytes(font, settings).unwrap();
-
-        let font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
-
         Self {
             renderer: renderer,
             dom: dom,
-            font: font,
-            font_layout: font_layout,
             state: None,
         }
     }
@@ -219,15 +195,14 @@ impl ApplicationHandler for App {
                 let mut buf = surface.buffer_mut().unwrap();
 
                 let layout_context = LayoutContext {
-                    font: &self.font,
+                    font: &self.renderer.fonts[0],
                     window_height: h,
                     window_width: w,
                 };
 
                 let layout = Layout::build(&self.dom, layout_context);
 
-                self.renderer
-                    .draw(&mut buf, layout, w, h, &self.font, &mut self.font_layout);
+                self.renderer.draw(&mut buf, layout, w, h);
 
                 buf.present().unwrap();
             }
