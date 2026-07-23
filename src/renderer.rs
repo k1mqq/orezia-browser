@@ -4,6 +4,7 @@ use fontdue::layout::{CoordinateSystem, GlyphRasterConfig, LayoutSettings, TextS
 use fontdue::{Font, Metrics};
 
 use crate::layout::Layout;
+use crate::layout::Text;
 
 struct Rect {
     x: usize,
@@ -98,7 +99,7 @@ impl Renderer {
     }
 
     fn draw_layout(&mut self, layout: Layout) {
-        let draw_calls: Vec<(String, Rect)> = layout
+        let draw_calls: Vec<(Text, Rect)> = layout
             .components
             .iter()
             .filter(|c| {
@@ -123,7 +124,7 @@ impl Renderer {
             .collect();
 
         for (text, text_box) in draw_calls {
-            self.draw_string(text, text_box, 20.0, Color { r: 0, g: 0, b: 0 });
+            self.draw_string(text.text, text_box, text.size, text.color);
         }
     }
 

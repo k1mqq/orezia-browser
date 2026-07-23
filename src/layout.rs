@@ -3,10 +3,10 @@ use fontdue::{
     layout::{CoordinateSystem, TextStyle},
 };
 
-use crate::styler::StyleValue;
-use crate::styler::StyledTree;
 use crate::styler::Unit;
+use crate::styler::{Color, StyledTree};
 use crate::{html_parser::NodeId, styler::StyledNode};
+use crate::{renderer, styler::StyleValue};
 
 pub struct Layout {
     pub components: Vec<Component>,
@@ -20,8 +20,16 @@ pub struct LayoutContext<'a> {
 
 pub struct Component {
     pub dimentions: Dimentions,
-    pub text: Option<String>,
+    pub text: Option<Text>,
     pub box_type: BoxType,
+}
+
+#[derive(Clone)]
+pub struct Text {
+    pub text: String,
+    // styler::Color? renderer::Color?
+    pub color: renderer::Color,
+    pub size: f32,
 }
 
 #[derive(Clone)]
@@ -121,14 +129,19 @@ fn next_component(
     };
 
     let margin = calc_margin(node);
-    let text = node.get_text();
+    let text = create_text(node);
     let box_type = box_type(node);
 
     let (x, y) = calc_pos(node, brother, parent);
 
-    let width = calc_width(node, parent, context);
-
-    let height = calc_height(node, context);
+    // inefficient!!! i think
+    let (width, height) = match &text {
+        Some(text) => (
+            calc_width(node, parent, context, text.size),
+            calc_height(node, context, text.size),
+        ),
+        None => (0.0, 0.0),
+    };
 
     components.push(Component {
         dimentions: Dimentions {
@@ -141,7 +154,7 @@ fn next_component(
             margin: margin,
             ..Default::default()
         },
-        text: text.cloned(),
+        text: text,
         box_type: box_type.clone(),
     });
 
@@ -231,7 +244,12 @@ fn calc_pos(
     }
 }
 
-fn calc_width(node: &StyledNode, parent: Option<&Component>, context: &LayoutContext) -> f32 {
+fn calc_width(
+    node: &StyledNode,
+    parent: Option<&Component>,
+    context: &LayoutContext,
+    font_size: f32,
+) -> f32 {
     match box_type(node) {
         BoxType::Block => match parent {
             Some(parent) => parent.dimentions.content.width,
@@ -241,7 +259,7 @@ fn calc_width(node: &StyledNode, parent: Option<&Component>, context: &LayoutCon
             Some(text) => text
                 .chars()
                 .map(|c| {
-                    let metrics = context.font.metrics(c, 20.0);
+                    let metrics = context.font.metrics(c, font_size);
                     metrics.advance_width.ceil()
                 })
                 .sum(),
@@ -250,7 +268,7 @@ fn calc_width(node: &StyledNode, parent: Option<&Component>, context: &LayoutCon
     }
 }
 
-fn calc_height(node: &StyledNode, context: &LayoutContext) -> f32 {
+fn calc_height(node: &StyledNode, context: &LayoutContext, font_size: f32) -> f32 {
     match node.get_text() {
         Some(text) => {
             let mut font_layout = fontdue::layout::Layout::new(CoordinateSystem::PositiveYDown);
@@ -260,7 +278,7 @@ fn calc_height(node: &StyledNode, context: &LayoutContext) -> f32 {
             };
             font_layout.reset(&font_layout_settings);
 
-            font_layout.append(&[context.font], &TextStyle::new(&text, 20.0, 0));
+            font_layout.append(&[context.font], &TextStyle::new(&text, font_size, 0));
             font_layout.height()
         }
         None => 0.0,
@@ -279,5 +297,26 @@ fn box_type(node: &StyledNode) -> BoxType {
         }
     } else {
         return crate::layout::BoxType::Block;
+    }
+}
+
+fn create_text(node: &StyledNode) -> Option<Text> {
+    match node.get_text() {
+        None => None,
+        Some(t) => {
+            let size = if let Some(StyleValue::Length(n, Unit::Px)) = node.styles.get("font-size") {
+                *n
+            } else {
+                20.0
+            };
+            let color = renderer::Color { r: 0, g: 0, b: 0 };
+
+            Some(Text {
+                // is this clone ok?
+                text: t.clone(),
+                size,
+                color,
+            })
+        }
     }
 }
