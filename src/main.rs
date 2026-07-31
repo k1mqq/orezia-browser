@@ -1,4 +1,5 @@
 mod app;
+mod css_parser;
 mod html_parser;
 mod http_client;
 mod layout;
