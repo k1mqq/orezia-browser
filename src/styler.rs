@@ -73,6 +73,27 @@ impl StyledTree {
 
         Self { nodes }
     }
+    pub fn print(&self, node: StyledNodeId, depth: usize) {
+        let indent = "  ".repeat(depth);
+        match &self.nodes[node].dom_node_type {
+            NodeType::Document => {}
+            NodeType::Element { tag, attributes } => {
+                println!("{}| <{}>", indent, tag);
+                for (name, value) in attributes {
+                    println!("{}|    {}=\"{}\"", indent, name, value);
+                }
+                for (style_key, style_value) in &self.nodes[node].styles {
+                    println!("{}|    {}={:?}", indent, style_key, style_value);
+                }
+                for &child in &self.nodes[node].children {
+                    self.print(child, depth + 1);
+                }
+            }
+            NodeType::Text(t) => {
+                println!("{}| \"{}\"", indent, t);
+            }
+        }
+    }
 }
 
 fn extract_stylesheets(dom: &Dom) -> Vec<StyleSheet> {

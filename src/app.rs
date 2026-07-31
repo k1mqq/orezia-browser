@@ -76,6 +76,7 @@ impl ApplicationHandler for App {
                 };
 
                 let styled_tree = StyledTree::build(&self.dom);
+                styled_tree.print(0, 0);
 
                 let layout = Layout::build(&styled_tree, layout_context);
 
