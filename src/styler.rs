@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
+    css_parser::{self, Selector, SimpleSelector, StyleSheet, Unit, Value},
     html_parser::{Dom, NodeId, NodeType},
-    styler::StyleValue::{Keyword, Length},
 };
 
 pub struct StyledTree {
@@ -11,7 +11,7 @@ pub struct StyledTree {
 
 pub struct StyledNode {
     pub dom_node_type: NodeType,
-    pub styles: HashMap<String, StyleValue>,
+    pub styles: HashMap<String, Value>,
     pub children: Vec<StyledNodeId>,
 }
 
@@ -23,26 +23,26 @@ pub struct StyledNode {
 //     Text(String),
 // }
 
-#[derive(Clone, Debug)]
-pub enum StyleValue {
-    Keyword(String),
-    Length(f32, Unit),
-    ColorValue(Color),
-}
+// #[derive(Clone, Debug)]
+// pub enum StyleValue {
+//     Keyword(String),
+//     Length(f32, Unit),
+//     ColorValue(Color),
+// }
 
-#[derive(Clone, Debug)]
-pub enum Unit {
-    Px,
-    // Percent,
-}
+// #[derive(Clone, Debug)]
+// pub enum Unit {
+//     Px,
+//     // Percent,
+// }
 
-#[derive(Clone, Debug)]
-pub struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
-}
+// #[derive(Clone, Debug)]
+// pub struct Color {
+//     r: u8,
+//     g: u8,
+//     b: u8,
+//     a: u8,
+// }
 
 type StyledNodeId = usize;
 
@@ -60,22 +60,36 @@ impl StyledTree {
     pub fn build(dom: &Dom) -> StyledTree {
         let mut nodes = Vec::new();
 
+        let style_sheets = extract_stylesheets(dom);
+
         let body_id = dom
-            .nodes
-            .iter()
-            .position(|node| {
-                if let NodeType::Element { tag, attributes: _ } = &node.node_type {
-                    tag == "body"
-                } else {
-                    false
-                }
-            })
+            .get_element_by_tag_name("body")
+            .first()
+            // is this clone ok?
+            .cloned()
             .expect("no body element?");
 
-        next_node(&mut nodes, dom, body_id, None);
+        next_node(&mut nodes, dom, body_id, None, &style_sheets);
 
         Self { nodes }
     }
+}
+
+fn extract_stylesheets(dom: &Dom) -> Vec<StyleSheet> {
+    let style_ids = dom.get_element_by_tag_name("style");
+
+    style_ids
+        .iter()
+        .filter_map(|&id| {
+            let children = &dom.nodes[id].children;
+            if children.len() == 1 {
+                if let NodeType::Text(t) = &dom.nodes[children[0]].node_type {
+                    return Some(css_parser::parse(t));
+                }
+            }
+            return None;
+        })
+        .collect()
 }
 
 fn next_node(
@@ -83,6 +97,7 @@ fn next_node(
     dom: &Dom,
     node_id: NodeId,
     parent_id: Option<StyledNodeId>,
+    style_sheets: &Vec<StyleSheet>,
 ) -> StyledNodeId {
     let node = &dom.nodes[node_id];
     let id = nodes.len();
@@ -102,55 +117,11 @@ fn next_node(
 
     match &node.node_type {
         NodeType::Element { tag, attributes } => {
-            match tag.as_str() {
-                "script" | "style" => {
-                    styles.insert(
-                        "display".to_string(),
-                        StyleValue::Keyword("none".to_string()),
-                    );
-                }
-                "body" => {
-                    styles.insert("margin".to_string(), StyleValue::Length(8.0, Unit::Px));
-                }
-                "a" | "span" => {
-                    styles.insert(
-                        "display".to_string(),
-                        StyleValue::Keyword("inline".to_string()),
-                    );
-                }
-                _ => {}
-            }
-            if let Some((_, style_text)) =
-                attributes.iter().find(|(attr_key, _)| attr_key == "style")
-            {
-                // nice iter:)
-                let raw_styles: Vec<&str> = style_text.split(';').collect();
-                for raw_style in raw_styles {
-                    let Some((key, raw_value)) = raw_style.split_once(':') else {
-                        continue;
-                    };
-
-                    if raw_value.ends_with("px") {
-                        let Ok(value) = raw_value.replace("px", "").parse::<f32>() else {
-                            continue;
-                        };
-                        styles.insert(key.to_string(), Length(value, Unit::Px));
-                    // } else if raw_value.ends_with("%") {
-                    //     let Ok(value) = raw_value.replace("%", "").parse::<f32>() else {
-                    //         continue;
-                    //     };
-                    //     styles.insert(key.to_string(), Length(value, Unit::Percent));
-                    } else {
-                        styles.insert(key.to_string(), Keyword(raw_value.to_string()));
-                    }
-                }
-            }
+            style_by_tag_name(&mut styles, tag, style_sheets);
+            style_by_attribute(&mut styles, attributes, style_sheets);
         }
         NodeType::Text(_) => {
-            styles.insert(
-                "display".to_string(),
-                StyleValue::Keyword("inline".to_string()),
-            );
+            styles.insert("display".to_string(), Value::Keyword("inline".to_string()));
         }
         _ => {}
     }
@@ -162,10 +133,101 @@ fn next_node(
     });
 
     for child in &node.children {
-        next_node(nodes, dom, *child, Some(id));
+        next_node(nodes, dom, *child, Some(id), style_sheets);
     }
 
     id
+}
+
+fn style_by_tag_name(
+    styles: &mut HashMap<String, Value>,
+    tag_name: &str,
+    style_sheets: &Vec<StyleSheet>,
+) {
+    // elements' default
+    match tag_name {
+        "script" | "style" => {
+            styles.insert("display".to_string(), Value::Keyword("none".to_string()));
+        }
+        "body" => {
+            styles.insert("margin".to_string(), Value::Length(8.0, Unit::Px));
+        }
+        "a" | "span" => {
+            styles.insert("display".to_string(), Value::Keyword("inline".to_string()));
+        }
+        _ => {}
+    }
+
+    // apply stylesheets
+
+    // it took 3h for this code
+    // let declarations: Vec<&css_parser::Declaration> =
+    style_sheets
+        .iter()
+        .flat_map(|ss| &ss.rules)
+        .filter(|r| {
+            r.selectors.iter().any(|selector| {
+                if let Selector::Simple(s) = selector {
+                    if let Some(tag) = &s.tag_name {
+                        return tag == tag_name;
+                    }
+                }
+                false
+            })
+        })
+        .flat_map(|r| r.declarations.iter())
+        .for_each(|d| {
+            styles.insert(d.name.clone(), d.value.clone());
+        });
+}
+
+fn style_by_attribute(
+    styles: &mut HashMap<String, Value>,
+    attributes: &Vec<(String, String)>,
+    style_sheets: &Vec<StyleSheet>,
+) {
+    for (attr_key, attr_value) in attributes {
+        match attr_key.as_str() {
+            "id" => {
+                style_sheets
+                    .iter()
+                    .flat_map(|ss| &ss.rules)
+                    .filter(|r| {
+                        r.selectors.iter().any(|selector| {
+                            if let Selector::Simple(s) = selector {
+                                if let Some(id) = &s.id {
+                                    return id == attr_value;
+                                }
+                            }
+                            false
+                        })
+                    })
+                    .flat_map(|r| r.declarations.iter())
+                    .for_each(|d| {
+                        styles.insert(d.name.clone(), d.value.clone());
+                    });
+            }
+
+            "class" => {
+                style_sheets
+                    .iter()
+                    .flat_map(|ss| &ss.rules)
+                    .filter(|r| {
+                        r.selectors.iter().any(|selector| {
+                            if let Selector::Simple(s) = selector {
+                                return s.class.iter().any(|c| c == attr_value);
+                            }
+                            false
+                        })
+                    })
+                    .flat_map(|r| r.declarations.iter())
+                    .for_each(|d| {
+                        styles.insert(d.name.clone(), d.value.clone());
+                    });
+            }
+            _ => {}
+        }
+    }
 }
 
 fn is_inheritable(key: &str) -> bool {

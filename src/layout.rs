@@ -3,10 +3,10 @@ use fontdue::{
     layout::{CoordinateSystem, TextStyle},
 };
 
-use crate::styler::Unit;
-use crate::styler::{Color, StyledTree};
+use crate::css_parser::{Unit, Value};
+use crate::renderer;
+use crate::styler::StyledTree;
 use crate::{html_parser::NodeId, styler::StyledNode};
-use crate::{renderer, styler::StyleValue};
 
 pub struct Layout {
     pub components: Vec<Component>,
@@ -192,7 +192,7 @@ fn next_component(
 }
 
 fn calc_margin(node: &StyledNode) -> EdgeSize {
-    if let Some(StyleValue::Length(l, Unit::Px)) = node.styles.get("margin") {
+    if let Some(Value::Length(l, Unit::Px)) = node.styles.get("margin") {
         return EdgeSize {
             left: *l,
             right: *l,
@@ -286,7 +286,7 @@ fn calc_height(node: &StyledNode, context: &LayoutContext, font_size: f32) -> f3
 }
 
 fn box_type(node: &StyledNode) -> BoxType {
-    if let Some(StyleValue::Keyword(t)) = node.styles.get("display") {
+    if let Some(Value::Keyword(t)) = node.styles.get("display") {
         match t.as_str() {
             "inline" => {
                 return crate::layout::BoxType::Inline;
@@ -304,7 +304,7 @@ fn create_text(node: &StyledNode) -> Option<Text> {
     match node.get_text() {
         None => None,
         Some(t) => {
-            let size = if let Some(StyleValue::Length(n, Unit::Px)) = node.styles.get("font-size") {
+            let size = if let Some(Value::Length(n, Unit::Px)) = node.styles.get("font-size") {
                 *n
             } else {
                 20.0

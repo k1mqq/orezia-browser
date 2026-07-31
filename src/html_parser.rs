@@ -71,6 +71,21 @@ impl Dom {
             }
         }
     }
+
+    pub fn get_element_by_tag_name(&self, tag_name: &str) -> Vec<NodeId> {
+        self.nodes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, node)| {
+                if let NodeType::Element { tag, attributes: _ } = &node.node_type {
+                    if tag.as_str() == tag_name {
+                        return Some(i);
+                    }
+                }
+                return None;
+            })
+            .collect()
+    }
 }
 
 pub fn parse(input: String) -> Dom {
