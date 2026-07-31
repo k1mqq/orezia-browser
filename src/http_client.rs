@@ -7,6 +7,8 @@ use std::sync::Arc;
 use rustls::ClientConnection;
 use rustls::StreamOwned;
 
+use crate::url::URL;
+
 #[derive(Debug)]
 pub enum HttpError {
     Connection(std::io::Error),
@@ -270,4 +272,31 @@ fn parse_field(field: String) -> Result<HashMap<String, String>, HttpError> {
     }
 
     Ok(headers)
+}
+
+pub fn get(url: &str) -> Result<Response, HttpError> {
+    let url = URL::parse(url).unwrap();
+    println!("{:?}", url);
+    let port = match url.port {
+        Some(n) => n,
+        None => match url.scheme.as_str() {
+            "https" => 443,
+            _ => 80,
+        },
+    };
+
+    let mut headers = HashMap::new();
+    headers.insert("Host".to_string(), url.host.to_string());
+    headers.insert("User-Agent".to_string(), "orezia-browser/0.0".to_string());
+    headers.insert("Accept-Encoding".to_string(), "identity".to_string());
+    let response = Request::new(
+        String::from(&url.host),
+        port,
+        format!("/{}", url.path),
+        Method::GET,
+        headers,
+        String::from(""),
+    )
+    .send()?;
+    Ok(response)
 }

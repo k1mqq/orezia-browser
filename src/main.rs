@@ -7,34 +7,12 @@ mod renderer;
 mod styler;
 mod url;
 
-use std::{collections::HashMap, env, error::Error};
+use std::{env, error::Error};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
 
-    let url = url::URL::parse(&args[1]).unwrap();
-    println!("{:?}", url);
-    let port = match url.port {
-        Some(n) => n,
-        None => match url.scheme.as_str() {
-            "https" => 443,
-            _ => 80,
-        },
-    };
-
-    let mut headers = HashMap::new();
-    headers.insert("Host".to_string(), url.host.to_string());
-    headers.insert("User-Agent".to_string(), "orezia-browser/0.0".to_string());
-    headers.insert("Accept-Encoding".to_string(), "identity".to_string());
-    let response = http_client::Request::new(
-        String::from(&url.host),
-        port,
-        format!("/{}", url.path),
-        http_client::Method::GET,
-        headers,
-        String::from(""),
-    )
-    .send()?;
+    let response = http_client::get(&args[1])?;
     println!("{}", &response.status);
     println!("{:?}", &response.headers);
     println!("{}", &response.body);
