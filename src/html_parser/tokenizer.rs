@@ -178,11 +178,6 @@ impl Tokenizer {
                             self.consume();
                             self.state = TokenizerState::Data;
 
-                            // last attribute is not pushed to this point
-                            self.current_attributes.push((
-                                self.current_attribute_name.clone(),
-                                self.current_attribute_value.clone(),
-                            ));
                             if self.is_current_tag_open {
                                 return Token::StartTag {
                                     name: self.current_tag_name.clone(),
@@ -198,12 +193,6 @@ impl Tokenizer {
                             }
                         }
                         Some(_) => {
-                            if !self.current_attribute_name.is_empty() {
-                                self.current_attributes.push((
-                                    self.current_attribute_name.clone(),
-                                    self.current_attribute_value.clone(),
-                                ));
-                            }
                             self.current_attribute_name = "".to_string();
                             self.current_attribute_value = "".to_string();
                             self.state = TokenizerState::AttributeName;
@@ -419,6 +408,13 @@ impl Tokenizer {
     }
 
     fn put_attribute(&mut self) -> Vec<(String, String)> {
+        if !self.current_attribute_name.is_empty() {
+            self.current_attributes.push((
+                self.current_attribute_name.clone(),
+                self.current_attribute_value.clone(),
+            ));
+        }
+
         let attr = self.current_attributes.clone();
         self.current_attributes.clear();
         attr
