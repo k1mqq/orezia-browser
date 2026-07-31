@@ -12,7 +12,7 @@ use std::{collections::HashMap, env, error::Error};
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
 
-    let url = url::URL::parse(args[1].to_string()).unwrap();
+    let url = url::URL::parse(&args[1]).unwrap();
     println!("{:?}", url);
     let port = match url.port {
         Some(n) => n,

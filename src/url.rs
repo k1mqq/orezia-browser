@@ -32,7 +32,7 @@ enum ParserState {
 }
 
 impl URL {
-    pub fn parse(text: String) -> Option<URL> {
+    pub fn parse(text: &str) -> Option<URL> {
         let mut pointer = 0;
         let mut state = ParserState::SchemeStart;
         let mut buffer = String::new();
