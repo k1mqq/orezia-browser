@@ -1,24 +1,29 @@
 // stole https://github.com/mbrubeck/robinson/blob/master/src/css.rs
 // because it is too good
+#[derive(Clone, Debug)]
 pub struct StyleSheet {
     pub rules: Vec<Rule>,
 }
 
+#[derive(Clone, Debug)]
 pub struct Rule {
     pub selectors: Vec<Selector>,
     pub declarations: Vec<Declaration>,
 }
 
+#[derive(Clone, Debug)]
 pub enum Selector {
     Simple(SimpleSelector),
 }
 
+#[derive(Clone, Debug)]
 pub struct SimpleSelector {
     pub tag_name: Option<String>,
     pub id: Option<String>,
     pub class: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
 pub struct Declaration {
     pub name: String,
     pub value: Value,
@@ -34,6 +39,7 @@ pub enum Value {
 #[derive(Clone, Debug)]
 pub enum Unit {
     Px,
+    Pt,
     // Percent,
 }
 
@@ -73,15 +79,23 @@ impl Parser {
             if self.eof() {
                 break;
             }
-            rules.push(self.parse_rule());
+            let rule = self.parse_rule();
+            if let Some(rule) = rule {
+                rules.push(rule);
+            }
         }
         rules
     }
 
-    fn parse_rule(&mut self) -> Rule {
-        Rule {
-            selectors: self.parse_selectors(),
-            declarations: self.parse_declarations(),
+    fn parse_rule(&mut self) -> Option<Rule> {
+        let selectors = self.parse_selectors();
+        if selectors.len() > 0 {
+            Some(Rule {
+                selectors: self.parse_selectors(),
+                declarations: self.parse_declarations(),
+            })
+        } else {
+            None
         }
     }
 
@@ -97,6 +111,10 @@ impl Parser {
                 }
 
                 '{' => break,
+                '[' | ':' => {
+                    self.skip_rule();
+                    return Vec::new();
+                }
                 c => panic!("Unexpected character {} in selector list", c),
             }
         }
@@ -180,6 +198,7 @@ impl Parser {
     fn parse_unit(&mut self) -> Unit {
         match &*self.parse_identifier().to_ascii_lowercase() {
             "px" => Unit::Px,
+            "pt" => Unit::Pt,
             _ => panic!("unrecognized unit"),
         }
     }
@@ -236,11 +255,22 @@ impl Parser {
     fn eof(&self) -> bool {
         self.pos >= self.input.len()
     }
+
+    fn skip_rule(&mut self) {
+        loop {
+            self.consume_char();
+            if self.next_char() == '}' {
+                self.consume_char();
+                break;
+            }
+        }
+    }
 }
 
 fn valid_identifier_char(c: char) -> bool {
     // TODO: Include U+00A0 and higher.
-    matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_')
+    // is whitespace ok?
+    matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | ',' | ' ')
 }
 
 pub fn parse(input: &str) -> StyleSheet {

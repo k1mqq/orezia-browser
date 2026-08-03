@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    css_parser::{self, Selector, SimpleSelector, StyleSheet, Unit, Value},
+    css_parser::{self, Selector, StyleSheet, Unit, Value},
     html_parser::{Dom, NodeId, NodeType},
 };
 
@@ -57,10 +57,11 @@ impl StyledNode {
 }
 
 impl StyledTree {
-    pub fn build(dom: &Dom) -> StyledTree {
+    pub fn build(dom: &Dom, css: &Vec<StyleSheet>) -> StyledTree {
         let mut nodes = Vec::new();
 
-        let style_sheets = extract_stylesheets(dom);
+        let mut style_sheets = extract_stylesheets(dom);
+        style_sheets.extend(css.iter().cloned());
 
         let body_id = dom
             .get_element_by_tag_name("body")
@@ -97,20 +98,19 @@ impl StyledTree {
 }
 
 fn extract_stylesheets(dom: &Dom) -> Vec<StyleSheet> {
+    let mut ss = Vec::new();
     let style_ids = dom.get_element_by_tag_name("style");
 
-    style_ids
-        .iter()
-        .filter_map(|&id| {
-            let children = &dom.nodes[id].children;
-            if children.len() == 1 {
-                if let NodeType::Text(t) = &dom.nodes[children[0]].node_type {
-                    return Some(css_parser::parse(t));
-                }
+    style_ids.iter().for_each(|&id| {
+        let children = &dom.nodes[id].children;
+        if children.len() == 1 {
+            if let NodeType::Text(t) = &dom.nodes[children[0]].node_type {
+                ss.push(css_parser::parse(t));
             }
-            return None;
-        })
-        .collect()
+        }
+    });
+
+    ss
 }
 
 fn next_node(

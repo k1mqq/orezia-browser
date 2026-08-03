@@ -6,22 +6,21 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
 
-use crate::html_parser::Dom;
 use crate::layout::{Layout, LayoutContext};
 use crate::renderer::Renderer;
 use crate::styler::StyledTree;
 
 struct App {
     renderer: Renderer,
-    dom: Dom,
+    styled_tree: StyledTree,
     state: Option<(Arc<Window>, softbuffer::Surface<Arc<Window>, Arc<Window>>)>,
 }
 
 impl App {
-    fn new(renderer: Renderer, dom: Dom) -> Self {
+    fn new(renderer: Renderer, styled_tree: StyledTree) -> Self {
         Self {
             renderer: renderer,
-            dom: dom,
+            styled_tree: styled_tree,
             state: None,
         }
     }
@@ -75,10 +74,7 @@ impl ApplicationHandler for App {
                     window_width: w,
                 };
 
-                let styled_tree = StyledTree::build(&self.dom);
-                styled_tree.print(0, 0);
-
-                let layout = Layout::build(&styled_tree, layout_context);
+                let layout = Layout::build(&self.styled_tree, layout_context);
 
                 self.renderer.draw(&mut buf, layout, w, h);
 
@@ -89,12 +85,12 @@ impl ApplicationHandler for App {
     }
 }
 
-pub fn init(dom: Dom) {
+pub fn init(styled_tree: StyledTree) {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
 
     let renderer = Renderer::new();
-    let mut app = App::new(renderer, dom);
+    let mut app = App::new(renderer, styled_tree);
 
     event_loop.run_app(&mut app).unwrap();
 }
