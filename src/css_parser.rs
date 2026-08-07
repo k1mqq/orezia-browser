@@ -79,8 +79,7 @@ impl Parser {
             if self.eof() {
                 break;
             }
-            let rule = self.parse_rule();
-            if let Some(rule) = rule {
+            if let Some(rule) = self.parse_rule() {
                 rules.push(rule);
             }
         }
@@ -88,38 +87,41 @@ impl Parser {
     }
 
     fn parse_rule(&mut self) -> Option<Rule> {
-        let selectors = self.parse_selectors();
-        if selectors.len() > 0 {
-            Some(Rule {
-                selectors: self.parse_selectors(),
-                declarations: self.parse_declarations(),
-            })
-        } else {
-            None
-        }
+        let selectors = match self.parse_selectors() {
+            Some(selectors) if !selectors.is_empty() => selectors,
+            Some(_) => return None,
+            None => {
+                self.skip_rule();
+                return None;
+            }
+        };
+        Some(Rule {
+            selectors: selectors,
+            declarations: self.parse_declarations(),
+        })
     }
 
-    fn parse_selectors(&mut self) -> Vec<Selector> {
+    fn parse_selectors(&mut self) -> Option<Vec<Selector>> {
         let mut selectors = Vec::new();
         loop {
             selectors.push(Selector::Simple(self.parse_simple_selector()));
             self.consume_whitespace();
             match self.next_char() {
-                ',' => {
+                Some(',') => {
                     self.consume_char();
                     self.consume_whitespace();
                 }
 
-                '{' => break,
-                '[' | ':' => {
+                Some('{') => break,
+                Some('[') | Some(':') => {
                     self.skip_rule();
-                    return Vec::new();
+                    return Some(Vec::new());
                 }
-                c => panic!("Unexpected character {} in selector list", c),
+                _ => return None,
             }
         }
         selectors.sort_by_key(|s| s.specificity());
-        selectors
+        Some(selectors)
     }
 
     fn parse_simple_selector(&mut self) -> SimpleSelector {
@@ -128,8 +130,8 @@ impl Parser {
             id: None,
             class: Vec::new(),
         };
-        while !self.eof() {
-            match self.next_char() {
+        while let Some(c) = self.next_char() {
+            match c {
                 '#' => {
                     self.consume_char();
                     selector.id = Some(self.parse_identifier());
@@ -152,71 +154,109 @@ impl Parser {
     }
 
     fn parse_declarations(&mut self) -> Vec<Declaration> {
-        self.expect_char('{');
+        if !self.expect_char('{') {
+            return Vec::new();
+        }
         let mut declarations = Vec::new();
         loop {
             self.consume_whitespace();
-            if self.next_char() == '}' {
-                self.consume_char();
-                break;
+            match self.next_char() {
+                None => break,
+                Some('}') => {
+                    self.consume_char();
+                    break;
+                }
+                Some(_) => match self.parse_declaration() {
+                    Some(declaration) => declarations.push(declaration),
+                    None => self.skip_declaration(),
+                },
             }
-            declarations.push(self.parse_declaration());
         }
         declarations
     }
 
-    fn parse_declaration(&mut self) -> Declaration {
+    fn parse_declaration(&mut self) -> Option<Declaration> {
         let name = self.parse_identifier();
+        if name.is_empty() {
+            return None;
+        }
         self.consume_whitespace();
-        self.expect_char(':');
+        if !self.expect_char(':') {
+            return None;
+        }
         self.consume_whitespace();
-        let value = self.parse_value();
+        let value = self.parse_value()?;
         self.consume_whitespace();
-        self.expect_char(';');
+        if !self.expect_char(';') {
+            return None;
+        }
 
-        Declaration { name, value }
+        Some(Declaration { name, value })
     }
 
-    fn parse_value(&mut self) -> Value {
-        match self.next_char() {
+    fn skip_declaration(&mut self) {
+        while let Some(c) = self.next_char() {
+            if c == '}' {
+                break;
+            }
+            self.pos += c.len_utf8();
+            if c == ';' {
+                break;
+            }
+        }
+    }
+
+    fn parse_value(&mut self) -> Option<Value> {
+        match self.next_char()? {
             '0'..='9' => self.parse_length(),
             '#' => self.parse_color(),
-            _ => Value::Keyword(self.parse_identifier()),
+            _ => {
+                let keyword = self.parse_identifier();
+                if keyword.is_empty() {
+                    None
+                } else {
+                    Some(Value::Keyword(keyword))
+                }
+            }
         }
     }
 
-    fn parse_length(&mut self) -> Value {
-        Value::Length(self.parse_float(), self.parse_unit())
+    fn parse_length(&mut self) -> Option<Value> {
+        let value = self.parse_float()?;
+        let unit = self.parse_unit()?;
+        Some(Value::Length(value, unit))
     }
 
-    fn parse_float(&mut self) -> f32 {
+    fn parse_float(&mut self) -> Option<f32> {
         self.consume_while(|c| matches!(c, '0'..='9' | '.'))
             .parse()
-            .unwrap()
+            .ok()
     }
 
-    fn parse_unit(&mut self) -> Unit {
+    fn parse_unit(&mut self) -> Option<Unit> {
         match &*self.parse_identifier().to_ascii_lowercase() {
-            "px" => Unit::Px,
-            "pt" => Unit::Pt,
-            _ => panic!("unrecognized unit"),
+            "px" => Some(Unit::Px),
+            "pt" => Some(Unit::Pt),
+            _ => None,
         }
     }
 
-    fn parse_color(&mut self) -> Value {
-        self.expect_char('#');
-        Value::ColorValue(Color {
-            r: self.parse_hex_pair(),
-            g: self.parse_hex_pair(),
-            b: self.parse_hex_pair(),
+    fn parse_color(&mut self) -> Option<Value> {
+        if !self.expect_char('#') {
+            return None;
+        }
+        Some(Value::ColorValue(Color {
+            r: self.parse_hex_pair()?,
+            g: self.parse_hex_pair()?,
+            b: self.parse_hex_pair()?,
             a: 255,
-        })
+        }))
     }
 
-    fn parse_hex_pair(&mut self) -> u8 {
+    fn parse_hex_pair(&mut self) -> Option<u8> {
         let s = &self.input[self.pos..self.pos + 2];
         self.pos += 2;
-        u8::from_str_radix(s, 16).unwrap()
+        u8::from_str_radix(s, 16).ok()
     }
 
     fn parse_identifier(&mut self) -> String {
@@ -230,26 +270,33 @@ impl Parser {
     // うおw
     fn consume_while(&mut self, test: impl Fn(char) -> bool) -> String {
         let mut result = String::new();
-        while !self.eof() && test(self.next_char()) {
-            result.push(self.consume_char());
+        while let Some(c) = self.next_char() {
+            if !test(c) {
+                break;
+            }
+            self.pos += c.len_utf8();
+            result.push(c);
         }
         result
     }
 
-    fn consume_char(&mut self) -> char {
-        let c = self.next_char();
+    fn consume_char(&mut self) -> Option<char> {
+        let c = self.next_char()?;
         self.pos += c.len_utf8();
-        c
+        Some(c)
     }
 
-    fn expect_char(&mut self, c: char) {
-        if self.consume_char() != c {
-            panic!("Expected {:?} at byte {} but it was not found", c, self.pos);
+    fn expect_char(&mut self, c: char) -> bool {
+        if self.next_char() == Some(c) {
+            self.consume_char();
+            true
+        } else {
+            false
         }
     }
 
-    fn next_char(&self) -> char {
-        self.input[self.pos..].chars().next().unwrap()
+    fn next_char(&self) -> Option<char> {
+        self.input[self.pos..].chars().next()
     }
 
     fn eof(&self) -> bool {
@@ -257,10 +304,9 @@ impl Parser {
     }
 
     fn skip_rule(&mut self) {
-        loop {
-            self.consume_char();
-            if self.next_char() == '}' {
-                self.consume_char();
+        while let Some(c) = self.next_char() {
+            self.pos += c.len_utf8();
+            if c == '}' {
                 break;
             }
         }
