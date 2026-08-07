@@ -304,12 +304,20 @@ fn create_text(node: &StyledNode) -> Option<Text> {
     match node.get_text() {
         None => None,
         Some(t) => {
-            let size = if let Some(Value::Length(n, Unit::Px)) = node.styles.get("font-size") {
-                *n
+            let size = if let Some(value) = node.styles.get("font-size") {
+                value.to_px().unwrap_or_else(|| 20.0)
             } else {
                 20.0
             };
-            let color = renderer::Color { r: 0, g: 0, b: 0 };
+            let color = if let Some(Value::ColorValue(color)) = node.styles.get("color") {
+                renderer::Color {
+                    r: color.r,
+                    g: color.g,
+                    b: color.b,
+                }
+            } else {
+                renderer::Color { r: 0, g: 0, b: 0 }
+            };
 
             Some(Text {
                 // is this clone ok?

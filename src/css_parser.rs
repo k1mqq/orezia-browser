@@ -47,10 +47,10 @@ pub enum Unit {
 
 #[derive(Clone, Debug)]
 pub struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
 }
 
 pub struct Parser {
@@ -114,6 +114,16 @@ impl SimpleSelector {
                 true
             }
             _ => false,
+        }
+    }
+}
+
+impl Value {
+    pub fn to_px(&self) -> Option<f32> {
+        match self {
+            Value::Length(v, Unit::Pt) => Some(*v * 4.0 / 3.0), // pt/px = 4/3
+            Value::Length(v, Unit::Px) => Some(*v),
+            _ => None,
         }
     }
 }
