@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let styled_tree = styler::StyledTree::build(&dom, &style_sheets);
 
-    // styled_tree.print(0, 0);
+    styled_tree.print(0, 0);
 
     app::init(styled_tree);
     Ok(())

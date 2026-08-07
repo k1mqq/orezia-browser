@@ -1,3 +1,5 @@
+use crate::html_parser::{Node, NodeType};
+
 // stole https://github.com/mbrubeck/robinson/blob/master/src/css.rs
 // because it is too good
 #[derive(Clone, Debug)]
@@ -67,6 +69,52 @@ impl Selector {
         let b = simple.class.len();
         let c = simple.tag_name.iter().count();
         (a, b, c)
+    }
+
+    pub fn matches(&self, node: &Node) -> bool {
+        match self {
+            Self::Simple(s) => s.matches(node),
+        }
+    }
+}
+
+impl SimpleSelector {
+    pub fn matches(&self, node: &Node) -> bool {
+        match &node.node_type {
+            NodeType::Element { tag, attributes } => {
+                if let Some(selector_tag) = &self.tag_name {
+                    if selector_tag != tag {
+                        return false;
+                    }
+                }
+                if let Some(selector_id) = &self.id {
+                    let id_matches = attributes
+                        .iter()
+                        .any(|(k, v)| k == "id" && v == selector_id);
+                    if !id_matches {
+                        return false;
+                    }
+                }
+
+                if !self.class.is_empty() {
+                    let element_classes: Vec<&str> = attributes
+                        .iter()
+                        .filter(|(k, _)| k == "class")
+                        .flat_map(|(_, v)| v.split_whitespace())
+                        .collect();
+                    let all_present = self
+                        .class
+                        .iter()
+                        .all(|c| element_classes.iter().any(|ec| ec == c));
+                    if !all_present {
+                        return false;
+                    }
+                }
+
+                true
+            }
+            _ => false,
+        }
     }
 }
 
@@ -315,8 +363,7 @@ impl Parser {
 
 fn valid_identifier_char(c: char) -> bool {
     // TODO: Include U+00A0 and higher.
-    // is whitespace ok?
-    matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | ',' | ' ')
+    matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_')
 }
 
 pub fn parse(input: &str) -> StyleSheet {

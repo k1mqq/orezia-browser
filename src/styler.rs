@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     css_parser::{self, Selector, StyleSheet, Unit, Value},
-    html_parser::{Dom, NodeId, NodeType},
+    html_parser::{Dom, Node, NodeId, NodeType},
 };
 
 pub struct StyledTree {
@@ -136,10 +136,12 @@ fn next_node(
         None => HashMap::new(),
     };
 
+    apply_style(&mut styles, &node, style_sheets);
+
     match &node.node_type {
         NodeType::Element { tag, attributes } => {
-            style_by_tag_name(&mut styles, tag, style_sheets);
-            style_by_attribute(&mut styles, attributes, style_sheets);
+            // style_by_tag_name(&mut styles, tag, style_sheets);
+            // style_by_attribute(&mut styles, attributes, style_sheets);
         }
         NodeType::Text(_) => {
             styles.insert("display".to_string(), Value::Keyword("inline".to_string()));
@@ -158,6 +160,31 @@ fn next_node(
     }
 
     id
+}
+
+fn apply_style(styles: &mut HashMap<String, Value>, node: &Node, style_sheets: &Vec<StyleSheet>) {
+    if let NodeType::Element { tag, attributes: _ } = &node.node_type {
+        match tag.as_str() {
+            "script" | "style" => {
+                styles.insert("display".to_string(), Value::Keyword("none".to_string()));
+            }
+            "body" => {
+                styles.insert("margin".to_string(), Value::Length(8.0, Unit::Px));
+            }
+            "a" | "span" => {
+                styles.insert("display".to_string(), Value::Keyword("inline".to_string()));
+            }
+            _ => {}
+        }
+    }
+    style_sheets
+        .iter()
+        .flat_map(|ss| &ss.rules)
+        .filter(|r| r.selectors.iter().any(|selector| selector.matches(node)))
+        .flat_map(|r| r.declarations.iter())
+        .for_each(|d| {
+            styles.insert(d.name.clone(), d.value.clone());
+        });
 }
 
 fn style_by_tag_name(
