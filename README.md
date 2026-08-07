@@ -10,7 +10,7 @@
  - URLパース
  - HTTPリクエスト
  - HTMLパース
- - softbuffer、winit、fontdueを使ったレンダリング~~(遅い)~~->速くなった！
+ - softbuffer、winit、fontdueを使ったレンダリング ~~(遅い)~~ ->速くなった！
  - CSSパース＆スタイリング(一部)
 
 できないこと
