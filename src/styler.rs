@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    css_parser::{self, Selector, StyleSheet, Unit, Value},
+    css_parser::{self, Color, Selector, StyleSheet, Unit, Value},
     html_parser::{Dom, Node, NodeId, NodeType},
 };
 
@@ -163,7 +163,7 @@ fn next_node(
 }
 
 fn apply_style(styles: &mut HashMap<String, Value>, node: &Node, style_sheets: &Vec<StyleSheet>) {
-    if let NodeType::Element { tag, attributes: _ } = &node.node_type {
+    if let NodeType::Element { tag, attributes } = &node.node_type {
         match tag.as_str() {
             "script" | "style" => {
                 styles.insert("display".to_string(), Value::Keyword("none".to_string()));
@@ -175,6 +175,21 @@ fn apply_style(styles: &mut HashMap<String, Value>, node: &Node, style_sheets: &
                 styles.insert("display".to_string(), Value::Keyword("inline".to_string()));
             }
             _ => {}
+        }
+
+        for (k, v) in attributes {
+            if k == "bgcolor" {
+                let hex = v.trim_start_matches('#');
+
+                let r = u8::from_str_radix(&hex[0..2], 16).unwrap();
+                let g = u8::from_str_radix(&hex[2..4], 16).unwrap();
+                let b = u8::from_str_radix(&hex[4..6], 16).unwrap();
+
+                styles.insert(
+                    "background-color".to_string(),
+                    Value::ColorValue(Color { r, g, b, a: 255 }),
+                );
+            }
         }
     }
     style_sheets

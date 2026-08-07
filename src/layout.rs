@@ -22,6 +22,7 @@ pub struct Component {
     pub dimentions: Dimentions,
     pub text: Option<Text>,
     pub box_type: BoxType,
+    pub background_color: Option<renderer::Color>,
 }
 
 #[derive(Clone)]
@@ -143,6 +144,17 @@ fn next_component(
         None => (0.0, 0.0),
     };
 
+    let background_color =
+        if let Some(Value::ColorValue(color)) = node.styles.get("background-color") {
+            Some(renderer::Color {
+                r: color.r,
+                g: color.g,
+                b: color.b,
+            })
+        } else {
+            None
+        };
+
     components.push(Component {
         dimentions: Dimentions {
             content: Rect {
@@ -156,6 +168,7 @@ fn next_component(
         },
         text: text,
         box_type: box_type.clone(),
+        background_color: background_color,
     });
 
     let mut last_child = None;

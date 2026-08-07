@@ -123,6 +123,33 @@ impl Renderer {
             })
             .collect();
 
+        let backgrounds: Vec<(Rect, Color)> = layout
+            .components
+            .iter()
+            .filter(|c| {
+                c.dimentions.content.x as u32 <= self.width
+                    && c.dimentions.content.y as u32 <= self.height
+            })
+            .filter_map(|c| {
+                if let Some(color) = &c.background_color {
+                    Some((
+                        Rect {
+                            x: c.dimentions.content.x as usize,
+                            y: c.dimentions.content.y as usize,
+                            width: c.dimentions.content.width as usize,
+                            height: c.dimentions.content.height as usize,
+                        },
+                        color.clone(),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for (rect, color) in backgrounds {
+            self.draw_rect(rect, color);
+        }
         for (text, text_box) in draw_calls {
             self.draw_string(text.text, text_box, text.size, text.color);
         }
@@ -172,6 +199,21 @@ impl Renderer {
                 let index = y * self.width as usize + x;
 
                 self.buffer[index] = blend(color, Color::from(self.buffer[index]), *bit).into();
+            }
+        }
+    }
+
+    fn draw_rect(&mut self, rect: Rect, color: Color) {
+        let x_end = (rect.x + rect.width).min(self.width as usize);
+        let y_end = (rect.y + rect.height).min(self.height as usize);
+
+        if rect.x >= x_end || rect.y >= y_end {
+            return;
+        }
+        for row in rect.y..y_end {
+            let row_offset = row * self.width as usize;
+            for col in rect.x..x_end {
+                self.buffer[row_offset + col] = color.into();
             }
         }
     }
