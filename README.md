@@ -10,10 +10,10 @@
  - URLパース
  - HTTPリクエスト
  - HTMLパース
- - softbuffer、winit、fontdueを使ったレンダリング（遅い）
+ - softbuffer、winit、fontdueを使ったレンダリング~~(遅い)~~->速くなった！
+ - CSSパース＆スタイリング(一部)
 
 できないこと
-  - CSS、style属性でのスタイリング
   - テキスト以外のレンダリング
   - GET以外のリクエスト
   - 200以外のレスポンスコード対応
