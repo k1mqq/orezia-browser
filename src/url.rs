@@ -176,7 +176,7 @@ impl URL {
                     continue;
                 }
                 ParserState::Path => {
-                    println!("{}", c);
+                    // println!("{}", c);
                     if matches!(c, '/' | '\\') {
                         // ok?
                         url.path.push_str(buffer.clone().as_str());
