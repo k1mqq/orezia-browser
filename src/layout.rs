@@ -115,6 +115,13 @@ fn next_component(
 ) -> Option<ComponentId> {
     // println!("{}", node_id);
     let node = &styled_tree.nodes[node_id];
+
+    if let Some(Value::Keyword(t)) = node.styles.get("display") {
+        if t == "none" {
+            return None;
+        }
+    }
+
     let id = components.len();
 
     let brother = if let Some(id) = brother_id {
@@ -131,6 +138,7 @@ fn next_component(
 
     let margin = calc_margin(node);
     let text = create_text(node);
+
     let box_type = box_type(node);
 
     let (x, y) = calc_pos(node, brother, parent);

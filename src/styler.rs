@@ -143,8 +143,12 @@ fn next_node(
             // style_by_tag_name(&mut styles, tag, style_sheets);
             // style_by_attribute(&mut styles, attributes, style_sheets);
         }
-        NodeType::Text(_) => {
-            styles.insert("display".to_string(), Value::Keyword("inline".to_string()));
+        NodeType::Text(text) => {
+            if text.trim().is_empty() {
+                styles.insert("display".to_string(), Value::Keyword("none".to_string()));
+            } else {
+                styles.insert("display".to_string(), Value::Keyword("inline".to_string()));
+            }
         }
         _ => {}
     }
